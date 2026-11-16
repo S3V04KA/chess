@@ -1,0 +1,41 @@
+# Patzer roadmap
+
+A loose, opinionated list of where Patzer is headed. Items aren't promises — they're the maintainer's current view, and they shift. Open an issue / discussion if you want to nudge priority.
+
+## Now
+
+- **Drag gesture for the phone moves sheet** — the tap-to-expand sheet shipped in 7.10; a real swipe is the follow-up.
+- **Master games when Lichess reopens its API** — the panel is wired (7.10) and waits on [lila#19610](https://github.com/lichess-org/lila/issues/19610); a self-hosted explorer works today via `LICHESS_EXPLORER_URL`.
+- **More languages.** Spanish landed in 7.10 thanks to @fiedri, German in 7.15 thanks to @eric-gpu, Russian in 7.16 thanks to @Fristail27; the recipe in CONTRIBUTING is now one table entry per file. Any language a contributor actually speaks is welcome.
+
+## Soon
+
+- **Federated PvP over Nostr relays.** Play someone running *their own* Patzer with no shared instance: each install gets a keypair, challenges and moves are (encrypted) ephemeral events on two or three public relays, resume comes from the PGN persistence PvP already has. Nobody hosts a server, nobody moderates one, kid mode stays at home. Opt-in.
+- **Web component tests** — the vitest harness (7.10) covers the server; the React side has one pure-helper suite so far.
+
+## Shipped since this was last updated
+
+- **Tournaments** — a private knockout bracket for the people on one instance. The admin shares an invitation link, the players join through it, the admin presses start. Stockfish fills the seat of an unpaired player instead of a bye, and the tournament keeps its own score — a Glicko rating never moves because of a tournament.
+- **7.16.0** — Learn section, beta (#49–#51, roadmap #7), opening-trainer follow-ups (#48), Docker coach setup (#53) and Referer hardening (#46) by @eric-gpu; Russian (#52) by @Fristail27.
+- **7.15.0** — German (#39), Lichess import (#40), invite-only sign-up (#42), soft and real-board sounds (#41/#43), opening trainer (#45) — all by @eric-gpu; DeepSeek, opt-in hosted engine and automatic Chess.com sync (#44) by @aminghuf.
+- **7.10.0** — Spanish (#14/#17), PvP draw / takeback / rematch (#10), "What's the threat?" (#12), master-game stats (#11), phone Play layout (#13), `setup.sh` (#16), vitest suite + e2e (#15); PvP sessions and clocks fixed; Brilliant classification fixed.
+- **Tactic puzzles from your blunders** — `/train`, personalized from your own analyzed games.
+- **MultiPV in the analyzer** — multiple candidate lines in Lab/Game Review, plus the full `brilliant`→`miss` classification tier.
+- **Stockfish strength tuning** — `UCI_LimitStrength` + `UCI_Elo` per difficulty tier.
+- **Mate-in-N display** — `#N` shown wherever an eval is mate.
+- **Repertoire view** — per-user opening tree at the Players/profile level, scored by win-rate per line.
+
+## Maybe / later
+
+- **Live demo at demo.patzer.app** (read-only, daily DB reset, rate-limited).
+- **Annotation engine.** Auto-generate PGN comments like `{Threatening Nf6+ winning the queen}` from pre-computed facts.
+- **Internal Glicko rating** between family-member profiles.
+- **Position search.** "All my games where I had a backward pawn on d6."
+- **Lichess study import / export.**
+
+## Out of scope
+
+- Variants (chess960, KOTH, 3-check). The classifier assumes standard chess.
+- Cloud-hosted multi-tenant SaaS.
+- Real-time spectator mode.
+- ML-trained move classification (Stockfish + Lichess formula is the floor).

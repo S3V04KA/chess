@@ -1,0 +1,407 @@
+// Web Audio synthesized chess sound effects. Synthesized by default — works
+// offline, keeps the bundle tiny. The signal chain runs through a soft
+// compressor + short convolution reverb (built from a decaying-noise impulse)
+// so even the synthesized layers get a bit of room around them. Move/capture
+// use wood-knock synthesis (transient noise click + low body resonance with
+// quick pitch droop); check/promotion use inharmonic-bell additive synthesis
+// (partials 1.0, 2.01, 2.99, 4.07 — close to a real handbell spectrum).
+// The optional 'board' move sounds are the only audio files: two short
+// recordings of real pieces on a wooden board (CC0, see THIRD_PARTY_NOTICES.md).
+
+import boardMoveUrl from '../assets/sounds/board-move.wav';
+import boardCaptureUrl from '../assets/sounds/board-capture.wav';
+
+type SoundKind = 'move' | 'capture' | 'check' | 'castle' | 'promotion' | 'game_start' | 'game_end' | 'click';
+/** 'classic' = the original bells; 'soft' swaps check and game-end for
+ *  marimba-style wooden bars that sit closer to the wood-knock move sounds. */
+export type SoundSet = 'classic' | 'soft';
+/** 'classic' = the synthesized wood knocks; 'board' plays recordings of real
+ *  pieces for move / capture / castle. Check, promotion and game end are
+ *  unaffected — they follow SoundSet. */
+export type MoveSoundSet = 'classic' | 'board';
+
+let ctx: AudioContext | null = null;
+let dryBus: GainNode | null = null;
+let wetBus: GainNode | null = null;
+let enabled = true;
+let soundSet: SoundSet = 'classic';
+let moveSoundSet: MoveSoundSet = 'classic';
+
+// The recordings: downloaded as soon as 'board' is chosen (no AudioContext
+// needed for that), decoded once the context exists. A move sound that comes
+// while they're still loading waits for them up to BOARD_WAIT_MS — otherwise
+// the first move after a page load (a puzzle's opening move, a lesson's first
+// move) would still be the synthesized knock. If they can't be loaded, moves
+// fall back to the synthesized knocks, so a move is never silent.
+const boardSamples: { move?: AudioBuffer; capture?: AudioBuffer } = {};
+let boardFiles: Promise<{ move: ArrayBuffer; capture: ArrayBuffer }> | null = null;
+let boardLoading: Promise<void> | null = null;
+let boardState: 'idle' | 'loading' | 'ready' | 'failed' = 'idle';
+const BOARD_WAIT_MS = 400;
+// The recordings are normalised to the same loudness; this puts them level
+// with the check / game-end sounds through the shared compressor.
+const BOARD_GAIN = 0.62;
+
+interface Bus { c: AudioContext; dry: GainNode; wet: GainNode; now: number }
+
+function ensureBus(): Bus | null {
+  if (typeof window === 'undefined') return null;
+  if (!ctx) {
+    try {
+      const Ctor = (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext);
+      ctx = new Ctor();
+    } catch { return null; }
+    const master = ctx.createGain();
+    master.gain.value = 0.85;
+
+    // Light glue-compression so transients (knocks) sit nicely against bells.
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -18;
+    comp.knee.value = 14;
+    comp.ratio.value = 3;
+    comp.attack.value = 0.003;
+    comp.release.value = 0.18;
+
+    // Reverb: stereo decaying-noise impulse → small-room ambience.
+    const verb = ctx.createConvolver();
+    verb.buffer = synthImpulseResponse(ctx, 0.55, 2.4);
+
+    dryBus = ctx.createGain();
+    dryBus.gain.value = 1.0;
+    wetBus = ctx.createGain();
+    wetBus.gain.value = 0.28;
+
+    dryBus.connect(comp);
+    wetBus.connect(verb).connect(comp);
+    comp.connect(master).connect(ctx.destination);
+  }
+  if (ctx.state === 'suspended') void ctx.resume();
+  if (moveSoundSet === 'board') void loadBoardSamples(ctx);
+  return { c: ctx, dry: dryBus!, wet: wetBus!, now: ctx.currentTime };
+}
+
+function fetchBoardFiles() {
+  boardFiles ??= (async () => {
+    const get = async (url: string) => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`board sound: HTTP ${res.status}`);
+      return res.arrayBuffer();
+    };
+    const [move, capture] = await Promise.all([get(boardMoveUrl), get(boardCaptureUrl)]);
+    return { move, capture };
+  })();
+  return boardFiles;
+}
+
+function loadBoardSamples(c: AudioContext): Promise<void> {
+  // One attempt per page load: if it fails (offline, blocked), moves simply
+  // keep the synthesized knocks instead of retrying on every sound.
+  if (!boardLoading) {
+    boardState = 'loading';
+    boardLoading = fetchBoardFiles().then(async (files) => {
+      boardSamples.move = await c.decodeAudioData(files.move);
+      boardSamples.capture = await c.decodeAudioData(files.capture);
+      boardState = 'ready';
+    }).catch(() => { boardState = 'failed'; });
+  }
+  return boardLoading;
+}
+
+/** Plays a board recording; false if 'board' isn't chosen or it hasn't loaded yet. */
+function boardSample(b: Bus, t0: number, kind: 'move' | 'capture', opts: { gain?: number; rate?: number } = {}): boolean {
+  const buf = moveSoundSet === 'board' ? boardSamples[kind] : undefined;
+  if (!buf) return false;
+  const src = b.c.createBufferSource();
+  src.buffer = buf;
+  src.playbackRate.value = opts.rate ?? 1;
+  const g = b.c.createGain();
+  g.gain.value = BOARD_GAIN * (opts.gain ?? 1);
+  src.connect(g).connect(b.dry);
+  src.start(t0);
+  return true;
+}
+
+function synthImpulseResponse(c: AudioContext, durationSec: number, decay: number): AudioBuffer {
+  const len = Math.floor(c.sampleRate * durationSec);
+  const buf = c.createBuffer(2, len, c.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const data = buf.getChannelData(ch);
+    for (let i = 0; i < len; i++) {
+      const t = i / len;
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, decay);
+    }
+  }
+  return buf;
+}
+
+// ---- Building blocks ---------------------------------------------------
+
+function noiseClick(b: Bus, t0: number, opts: { duration?: number; gain?: number; cutoff?: number; highpass?: number; wet?: number }) {
+  const { c, dry, wet } = b;
+  const duration = opts.duration ?? 0.014;
+  const buf = c.createBuffer(1, Math.max(1, Math.floor(c.sampleRate * duration)), c.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1);
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  const hp = c.createBiquadFilter();
+  hp.type = 'highpass';
+  hp.frequency.value = opts.highpass ?? 800;
+  const lp = c.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = opts.cutoff ?? 3500;
+  const peak = opts.gain ?? 0.35;
+  const g = c.createGain();
+  g.gain.setValueAtTime(peak, t0);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+  const sendWet = c.createGain();
+  sendWet.gain.value = opts.wet ?? 0.45;
+  src.connect(hp).connect(lp).connect(g);
+  g.connect(dry);
+  g.connect(sendWet).connect(wet);
+  src.start(t0);
+  src.stop(t0 + duration + 0.05);
+}
+
+function damped(b: Bus, t0: number, opts: { freq: number; duration: number; gain?: number; freqEnd?: number; type?: OscillatorType; wet?: number; attack?: number }) {
+  const { c, dry, wet } = b;
+  const peak = opts.gain ?? 0.16;
+  const attack = opts.attack ?? 0.004;
+  const osc = c.createOscillator();
+  osc.type = opts.type ?? 'sine';
+  osc.frequency.setValueAtTime(opts.freq, t0);
+  if (opts.freqEnd !== undefined) {
+    osc.frequency.exponentialRampToValueAtTime(Math.max(1, opts.freqEnd), t0 + opts.duration);
+  }
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(peak, t0 + attack);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + opts.duration);
+  const sendWet = c.createGain();
+  sendWet.gain.value = opts.wet ?? 0.3;
+  osc.connect(g);
+  g.connect(dry);
+  g.connect(sendWet).connect(wet);
+  osc.start(t0);
+  osc.stop(t0 + opts.duration + 0.05);
+}
+
+function woodKnock(b: Bus, t0: number, opts: { pitch: number; duration?: number; gain?: number; bright?: boolean }) {
+  const gain = opts.gain ?? 0.6;
+  const duration = opts.duration ?? 0.09;
+  const bright = opts.bright ?? false;
+  noiseClick(b, t0, {
+    duration: 0.014,
+    gain: gain * 0.55,
+    cutoff: bright ? 5000 : 3000,
+    highpass: bright ? 1100 : 800,
+    wet: 0.4,
+  });
+  damped(b, t0, {
+    freq: opts.pitch,
+    freqEnd: opts.pitch * 0.55,
+    duration,
+    gain: gain * 0.45,
+    type: 'sine',
+    wet: 0.25,
+  });
+  // Subtle higher partial for a touch of crispness.
+  damped(b, t0, {
+    freq: opts.pitch * 3.2,
+    duration: duration * 0.5,
+    gain: gain * 0.06,
+    type: 'sine',
+    wet: 0.4,
+  });
+}
+
+function bell(b: Bus, t0: number, opts: { freq: number; duration: number; gain?: number }) {
+  // Inharmonic partials approximating a small handbell.
+  const partials = [1.0, 2.01, 2.99, 4.07, 5.42];
+  const amps =    [1.0, 0.55, 0.32, 0.18, 0.10];
+  const peak = opts.gain ?? 0.18;
+  for (let i = 0; i < partials.length; i++) {
+    damped(b, t0, {
+      freq: opts.freq * partials[i]!,
+      duration: opts.duration * (1 - i * 0.1),
+      gain: peak * amps[i]!,
+      type: 'sine',
+      wet: 0.45 + i * 0.05,
+      attack: 0.003,
+    });
+  }
+}
+
+function pluck(b: Bus, t0: number, opts: { freq: number; duration: number; gain?: number }) {
+  // Triangle with quick decay — a soft, modern UI "pluck".
+  damped(b, t0, {
+    freq: opts.freq,
+    duration: opts.duration,
+    gain: opts.gain ?? 0.14,
+    type: 'triangle',
+    wet: 0.2,
+    attack: 0.005,
+  });
+  damped(b, t0, {
+    freq: opts.freq * 2,
+    duration: opts.duration * 0.6,
+    gain: (opts.gain ?? 0.14) * 0.35,
+    type: 'sine',
+    wet: 0.25,
+  });
+}
+
+function marimba(b: Bus, t0: number, opts: { freq: number; duration: number; gain?: number }) {
+  // A tuned wooden bar: fundamental plus the ~4x and ~10x overtones a marimba
+  // bar is cut to produce, with a short mallet click on top. The overtones die
+  // first, which is what makes it read as "soft wood" rather than "bell".
+  const peak = opts.gain ?? 0.2;
+  noiseClick(b, t0, { duration: 0.008, gain: peak * 0.5, cutoff: 2500, highpass: 400, wet: 0.2 });
+  damped(b, t0, { freq: opts.freq, duration: opts.duration, gain: peak, attack: 0.003, wet: 0.35 });
+  damped(b, t0, { freq: opts.freq * 3.93, duration: opts.duration * 0.35, gain: peak * 0.28, attack: 0.002, wet: 0.3 });
+  damped(b, t0, { freq: opts.freq * 9.87, duration: opts.duration * 0.12, gain: peak * 0.08, attack: 0.001, wet: 0.3 });
+}
+
+// ---- Public API ---------------------------------------------------------
+
+export function setSoundEnabled(on: boolean) { enabled = on; }
+export function getSoundEnabled() { return enabled; }
+export function setSoundSet(set: SoundSet) { soundSet = set === 'soft' ? 'soft' : 'classic'; }
+export function setMoveSoundSet(set: MoveSoundSet) {
+  moveSoundSet = set === 'board' ? 'board' : 'classic';
+  if (moveSoundSet !== 'board') return;
+  if (ctx) void loadBoardSamples(ctx);
+  else void fetchBoardFiles().catch(() => { /* loadBoardSamples notes the failure */ });
+}
+
+/** Resolves once the chosen move sounds can play — e.g. so a settings preview
+ *  doesn't fall back to the synthesized knock while the recordings decode.
+ *  Call from a click handler: it may have to create the AudioContext. */
+export function moveSoundsReady(): Promise<void> {
+  if (moveSoundSet !== 'board') return Promise.resolve();
+  const b = ensureBus();
+  return b ? loadBoardSamples(b.c) : Promise.resolve();
+}
+
+// Some browsers require user interaction before audio plays. Call this once
+// from a click/keydown handler to "warm" the context.
+export function unlockAudio() {
+  const b = ensureBus();
+  if (b && b.c.state === 'suspended') void b.c.resume();
+}
+
+export function playSound(kind: SoundKind) {
+  if (!enabled) return;
+  const b = ensureBus();
+  if (!b) return;
+  if (moveSoundSet === 'board' && boardState === 'loading' && (kind === 'move' || kind === 'capture' || kind === 'castle')) {
+    // Wait for the recordings — but not so long that the sound lags the move.
+    let done = false;
+    const fallback = setTimeout(() => { done = true; playNow(kind); }, BOARD_WAIT_MS);
+    void boardLoading!.then(() => {
+      if (done) return;
+      clearTimeout(fallback);
+      playNow(kind);
+    });
+    return;
+  }
+  playNow(kind);
+}
+
+function playNow(kind: SoundKind) {
+  const b = ensureBus();
+  if (!b) return;
+  const t = b.now + 0.005; // tiny lead-in so the first sample isn't clipped
+
+  switch (kind) {
+    case 'move':
+      if (boardSample(b, t, 'move')) break;
+      woodKnock(b, t, { pitch: 280, duration: 0.09, gain: 0.55 });
+      break;
+    case 'capture':
+      if (boardSample(b, t, 'capture', { gain: 1.12 })) break;
+      // Heavier, slightly grittier knock — broader noise + lower body.
+      woodKnock(b, t, { pitch: 165, duration: 0.13, gain: 0.7, bright: false });
+      noiseClick(b, t + 0.008, { duration: 0.04, gain: 0.18, cutoff: 1200, highpass: 350, wet: 0.5 });
+      break;
+    case 'check': {
+      if (soundSet === 'soft') {
+        // Two short rising marimba notes (E5 → A5).
+        marimba(b, t,         { freq: 659, duration: 0.28, gain: 0.2 });
+        marimba(b, t + 0.085, { freq: 880, duration: 0.35, gain: 0.2 });
+        break;
+      }
+      // Two-tone bell — a small alert without being shrill.
+      bell(b, t,         { freq: 1175, duration: 0.55, gain: 0.18 });   // D6
+      bell(b, t + 0.09,  { freq: 880,  duration: 0.55, gain: 0.14 });   // A5
+      break;
+    }
+    case 'castle':
+      // King, then rook: the board move twice, the second a touch lower and softer.
+      if (boardSample(b, t, 'move')) {
+        boardSample(b, t + 0.11, 'move', { gain: 0.8, rate: 0.96 });
+        break;
+      }
+      // Two crisp knocks (king + rook).
+      woodKnock(b, t,        { pitch: 280, duration: 0.08, gain: 0.5, bright: true });
+      woodKnock(b, t + 0.07, { pitch: 240, duration: 0.09, gain: 0.55, bright: true });
+      break;
+    case 'promotion': {
+      // Bright ascending bell arpeggio — C major triad up to the octave.
+      bell(b, t,         { freq: 523,  duration: 0.45, gain: 0.16 }); // C5
+      bell(b, t + 0.08,  { freq: 659,  duration: 0.45, gain: 0.16 }); // E5
+      bell(b, t + 0.16,  { freq: 784,  duration: 0.55, gain: 0.18 }); // G5
+      bell(b, t + 0.26,  { freq: 1047, duration: 0.7,  gain: 0.20 }); // C6
+      break;
+    }
+    case 'game_start': {
+      // Major-third welcome chord with a small flourish.
+      pluck(b, t,        { freq: 392, duration: 0.35, gain: 0.14 }); // G4
+      pluck(b, t + 0.05, { freq: 523, duration: 0.45, gain: 0.14 }); // C5
+      pluck(b, t + 0.10, { freq: 659, duration: 0.55, gain: 0.14 }); // E5
+      break;
+    }
+    case 'game_end': {
+      if (soundSet === 'soft') {
+        // The classic G5 → E5 → C5 cadence on marimba, with a faint bell
+        // layered underneath so it still sounds like Patzer, just softer.
+        const notes: [number, number, number][] = [[784, 0, 0.5], [659, 0.16, 0.6], [523, 0.34, 1.1]];
+        for (const [freq, delay, duration] of notes) {
+          marimba(b, t + delay, { freq, duration, gain: 0.15 });
+          bell(b, t + delay, { freq, duration: duration * 0.8, gain: 0.045 });
+        }
+        damped(b, t + 0.34, { freq: 131, duration: 0.7, gain: 0.07, type: 'sine', wet: 0.45 });
+        break;
+      }
+      // Resolving cadence — descend G5 → E5 → C5 → low rumble.
+      bell(b, t,        { freq: 784, duration: 0.55, gain: 0.16 });
+      bell(b, t + 0.16, { freq: 659, duration: 0.6,  gain: 0.16 });
+      bell(b, t + 0.34, { freq: 523, duration: 0.9,  gain: 0.20 });
+      damped(b, t + 0.34, { freq: 130, duration: 0.6, gain: 0.10, type: 'sine', wet: 0.45 });
+      break;
+    }
+    case 'click':
+      // Short, soft UI tick.
+      pluck(b, t, { freq: 880, duration: 0.08, gain: 0.08 });
+      break;
+  }
+}
+
+// Decide which sound to play for a SAN/UCI move + flags.
+export function soundForMove(args: { san?: string; capture?: boolean; check?: boolean; castle?: boolean; promotion?: boolean }) {
+  if (args.castle) return playSound('castle');
+  if (args.promotion) return playSound('promotion');
+  if (args.check) return playSound('check');
+  if (args.capture) return playSound('capture');
+  return playSound('move');
+}
+
+// Quick deduce flags from SAN string (used in places where chess.js move object isn't handy).
+export function inferMoveFlagsFromSan(san: string): { capture: boolean; check: boolean; castle: boolean; promotion: boolean } {
+  return {
+    capture: san.includes('x'),
+    check: san.endsWith('+') || san.endsWith('#'),
+    castle: san === 'O-O' || san === 'O-O-O' || san === '0-0' || san === '0-0-0',
+    promotion: /=[QRBN]/.test(san),
+  };
+}

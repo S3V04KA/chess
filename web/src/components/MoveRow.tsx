@@ -1,0 +1,125 @@
+import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import { cn } from '../lib/utils';
+import { styleFor, GLYPH_SVG } from '../lib/classification';
+
+interface Move { ply: number; san: string; classification?: string }
+
+interface Props {
+  num: number;
+  white?: Move;
+  black?: Move;
+  current: number;
+  onSelect: (ply: number) => void;
+  /** When set, only these plies stand out (a category picked in the Game
+   *  Report); the rest of the list is dimmed. */
+  highlight?: Set<number> | null;
+}
+
+// Single move-pair row. Tints the row's left edge by the worst classification
+// of the two half-moves so a glance down the list reveals where the game
+// tilted (matches chess.com Game Review). No alternate-row striping —
+// chess.com uses only 1px hairlines between move pairs.
+export default function MoveRow({ num, white, black, current, onSelect, highlight }: Props) {
+  const { t } = useTranslation();
+  const wCur = white?.ply === current;
+  const bCur = black?.ply === current;
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  // Keep the current row visible inside the move-list's own scroll container —
+  // but ONLY that container. Native `scrollIntoView` cascades up every
+  // scrollable ancestor, which previously scrolled the right rail and the
+  // page on each step, yanking focus away from the board.
+  useEffect(() => {
+    if (!(wCur || bCur)) return;
+    const el = ref.current;
+    if (!el) return;
+    let scroller: HTMLElement | null = el.parentElement;
+    while (scroller && scroller !== document.body) {
+      const cs = getComputedStyle(scroller);
+      if (cs.overflowY === 'auto' || cs.overflowY === 'scroll') break;
+      scroller = scroller.parentElement;
+    }
+    if (!scroller || scroller === document.body) return;
+    const elRect = el.getBoundingClientRect();
+    const scRect = scroller.getBoundingClientRect();
+    const fullyVisible = elRect.top >= scRect.top && elRect.bottom <= scRect.bottom;
+    if (fullyVisible) return;
+    const target = scroller.scrollTop + (elRect.top - scRect.top) - scroller.clientHeight / 2 + el.offsetHeight / 2;
+    scroller.scrollTo({ top: target, behavior: 'smooth' });
+  }, [wCur, bCur]);
+
+  const tint = pickTint(white?.classification, black?.classification);
+
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        'grid grid-cols-[2.25rem_1fr_1fr] items-stretch border-b border-chesscom-100 dark:border-chesscom-800',
+        tint,
+      )}
+    >
+      <div className="flex items-center justify-end pr-2 text-xs tabular-nums text-chesscom-400">{num}.</div>
+      <Half move={white} current={wCur} onSelect={onSelect} t={t} highlight={highlight} />
+      <Half move={black} current={bCur} onSelect={onSelect} t={t} highlight={highlight} />
+    </div>
+  );
+}
+
+function Half({
+  move, current, onSelect, t, highlight,
+}: { move?: Move; current: boolean; onSelect: (p: number) => void; t: (k: string) => string; highlight?: Set<number> | null }) {
+  if (!move) return <div />;
+  const style = styleFor(move.classification);
+  const picked = !!highlight?.has(move.ply);
+  const dimmed = !!highlight && !picked && !current;
+  return (
+    <button
+      onClick={() => onSelect(move.ply)}
+      title={style ? t(`classification.${style.labelKey}`) : undefined}
+      className={cn(
+        'group flex items-center justify-between gap-2 px-2 py-1.5 text-left text-sm transition-colors',
+        current
+          ? 'bg-chesscom-900 text-white dark:bg-chesscom-100 dark:text-chesscom-900'
+          : 'hover:bg-chesscom-100 dark:hover:bg-chesscom-800',
+        picked && !current && 'bg-gold-50 ring-1 ring-inset ring-gold-500/60 dark:bg-gold-700/15',
+        dimmed && 'opacity-35',
+      )}
+    >
+      <span className="truncate font-medium tabular-nums">{move.san}</span>
+      {style && (
+        <span
+          className={cn(
+            'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white',
+            style.bgClass,
+            current && 'ring-1 ring-white/60',
+          )}
+        >
+          <svg viewBox="0 0 24 24" width={14} height={14} aria-hidden="true">
+            {GLYPH_SVG[style.glyph]}
+          </svg>
+        </span>
+      )}
+    </button>
+  );
+}
+
+// Severity order: blunder/miss > mistake > inaccuracy > brilliant > great > none.
+// Brilliants and greats earn their own positive-spotlight tints (teal / steel
+// blue) — chess.com's highlight reel leads with them, not buries them.
+function pickTint(a?: string, b?: string): string {
+  const sev = (c?: string) =>
+    c === 'blunder' ? 5 :
+    c === 'miss' ? 5 :
+    c === 'mistake' ? 4 :
+    c === 'inaccuracy' ? 3 :
+    c === 'brilliant' ? 2 :
+    c === 'great' ? 1 : 0;
+  const w = Math.max(sev(a), sev(b));
+  if (w === 5) return 'shadow-[inset_3px_0_0_0_theme(colors.move.blunder)]';
+  if (w === 4) return 'shadow-[inset_3px_0_0_0_theme(colors.move.mistake)]';
+  if (w === 3) return 'shadow-[inset_3px_0_0_0_theme(colors.move.inaccuracy)]';
+  if (w === 2) return 'shadow-[inset_3px_0_0_0_theme(colors.move.brilliant)]';
+  if (w === 1) return 'shadow-[inset_3px_0_0_0_theme(colors.move.great)]';
+  return '';
+}

@@ -1,0 +1,268 @@
+@import 'chessground/assets/chessground.base.css';
+@import 'chessground/assets/chessground.brown.css';
+@import 'chessground/assets/chessground.cburnett.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light dark;
+}
+
+html, body, #root { height: 100%; }
+html, body { overflow-x: clip; }
+body {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  /* v5 chess.com palette: light = warm off-white, dark = deep sage. */
+  background: #f1f1f0;
+  color: #262421;
+}
+
+.dark body {
+  background: #262421;
+  color: #f1f1f0;
+}
+
+/* Polished chessground tweaks */
+cg-board {
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/* Chessground's default coord positioning uses fixed pixel offsets
+   (top: -20px on ranks, left: 24px on files) that are calibrated for
+   a large desktop board. On a small mobile board those become a large
+   fraction of the width and labels visibly drift off their squares.
+   Switch to pure percentage positioning so labels stay aligned at any
+   size, and put them inside the board edges (lichess/chess.com style). */
+.cg-wrap coords.ranks {
+  top: 0;
+  left: 2px;
+  width: auto;
+  height: 100%;
+  font-weight: 600;
+  font-size: clamp(8px, 1.6vmin, 11px);
+}
+.cg-wrap coords.ranks coord {
+  transform: none;
+  padding-top: 1px;
+  text-align: left;
+}
+.cg-wrap coords.files {
+  left: 0;
+  bottom: 1px;
+  width: 100%;
+  height: auto;
+  font-weight: 600;
+  font-size: clamp(8px, 1.6vmin, 11px);
+}
+.cg-wrap coords.files coord {
+  padding-right: 4px;
+  text-align: right;
+}
+
+/* Last-move highlight — translucent yellow (chess.com's actual color),
+   distinct from the gold accent reserved for nav + focus rings. */
+cg-board square.last-move {
+  background-color: rgba(255, 235, 59, 0.40) !important;
+  animation: last-move-pulse 360ms ease-out;
+}
+cg-board square.last-move.move-dest,
+cg-board square.last-move.premove-dest {
+  background-color: rgba(255, 235, 59, 0.55) !important;
+}
+
+@keyframes last-move-pulse {
+  0%   { background-color: rgba(255, 235, 59, 0.65) !important; }
+  100% { background-color: rgba(255, 235, 59, 0.40) !important; }
+}
+
+/* Board themes — overlay an inline-SVG checkerboard on top of cg-board. The
+   SVG describes one 2×2 unit (one light, one dark square in each corner);
+   tiled at 25% × 25% it yields a clean 8×8 axis-aligned board.
+   Default is "green" (chess.com's canonical theme). */
+.board-theme-wood cg-board {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 2 2' shape-rendering='crispEdges'><rect width='2' height='2' fill='%23f0d9b5'/><rect x='1' width='1' height='1' fill='%23b58863'/><rect y='1' width='1' height='1' fill='%23b58863'/></svg>") !important;
+  background-size: 25% 25% !important;
+  background-repeat: repeat !important;
+  background-position: 0 0 !important;
+}
+.board-theme-green cg-board {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 2 2' shape-rendering='crispEdges'><rect width='2' height='2' fill='%23eeeed2'/><rect x='1' width='1' height='1' fill='%23769656'/><rect y='1' width='1' height='1' fill='%23769656'/></svg>") !important;
+  background-size: 25% 25% !important;
+  background-repeat: repeat !important;
+  background-position: 0 0 !important;
+}
+.board-theme-blue cg-board {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 2 2' shape-rendering='crispEdges'><rect width='2' height='2' fill='%23dee3e6'/><rect x='1' width='1' height='1' fill='%23788a94'/><rect y='1' width='1' height='1' fill='%23788a94'/></svg>") !important;
+  background-size: 25% 25% !important;
+  background-repeat: repeat !important;
+  background-position: 0 0 !important;
+}
+
+/* Chess pieces as icons outside a board (Learn section badges). chessground
+   styles every <piece> for an 8×8 grid; here one piece fills its box. */
+.learn-piece { position: relative; }
+.learn-piece piece {
+  width: 100%;
+  height: 100%;
+  transform: none;
+}
+
+@layer components {
+  /* Buttons — rounded-md (6px) per chess.com spec. */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gold-500/50 focus-visible:ring-offset-panel dark:focus-visible:ring-offset-chesscom-900 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98];
+  }
+  /* PRIMARY CTA = chess.com green. Reserve for the most important action on
+     each screen (Start game, Generate review, Send challenge). */
+  .btn-primary { @apply btn bg-green-500 text-white hover:bg-green-600 active:bg-green-700 shadow-soft; }
+  .btn-secondary { @apply btn bg-chesscom-100 text-chesscom-900 hover:bg-chesscom-200 dark:bg-chesscom-700 dark:text-chesscom-100 dark:hover:bg-chesscom-600; }
+  .btn-ghost { @apply btn text-chesscom-700 hover:bg-chesscom-100 dark:text-chesscom-200 dark:hover:bg-chesscom-800; }
+  .btn-danger { @apply btn bg-bad text-white hover:bg-red-600; }
+  /* Alias for .btn-primary — kept for any unmigrated callsite. */
+  .btn-play { @apply btn-primary; }
+
+  /* Cards — rounded-lg (8px), 1px solid border, soft shadow. Chess.com-tight. */
+  .card {
+    @apply rounded-lg bg-white border border-chesscom-200 shadow-soft dark:bg-chesscom-800 dark:border-chesscom-700;
+  }
+
+  .card-hover {
+    @apply card transition-all duration-150 hover:shadow-lift hover:-translate-y-0.5 hover:border-chesscom-300 dark:hover:border-chesscom-600;
+  }
+
+  .input {
+    @apply block w-full rounded-md border border-chesscom-200 bg-white px-3 py-2 text-sm text-chesscom-900 placeholder:text-chesscom-300 transition-colors focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 focus:outline-none dark:bg-chesscom-900 dark:border-chesscom-700 dark:text-chesscom-100 dark:placeholder:text-chesscom-400;
+  }
+
+  .label { @apply text-xs font-semibold uppercase tracking-wide text-chesscom-500 dark:text-chesscom-300; }
+
+  .badge { @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium; }
+
+  /* Section header used inside cards */
+  .section-header {
+    @apply flex items-center gap-3 border-b border-chesscom-200 bg-chesscom-50 px-4 py-3 dark:border-chesscom-700 dark:bg-chesscom-900/40;
+  }
+  .section-icon {
+    @apply flex h-9 w-9 shrink-0 items-center justify-center rounded-md;
+  }
+  .section-title { @apply font-semibold leading-tight; }
+  .section-desc  { @apply text-xs text-chesscom-500; }
+
+  /* Page header shorthand */
+  .page-h1 { @apply text-2xl font-bold tracking-tight; letter-spacing: -0.01em; }
+  .page-sub { @apply mt-1 text-sm text-chesscom-500; }
+
+  /* Pill-style tab strip used by ReviewTabs / KeyMomentsList nav. */
+  .tab-pill {
+    @apply relative px-3 py-2 text-sm font-medium text-chesscom-500 hover:text-chesscom-900 dark:hover:text-chesscom-100 transition-colors;
+  }
+  .tab-pill.is-active {
+    @apply text-chesscom-900 dark:text-chesscom-100;
+  }
+  .tab-pill.is-active::after {
+    content: '';
+    @apply absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-gold-500;
+  }
+}
+
+/* Scrollbar polish */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: rgba(125, 118, 112, 0.3); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(125, 118, 112, 0.5); }
+
+/* ─── Living pieces (kid mode) ─────────────────────────────────────────
+   Floating mood bubbles over each viewer-side piece on the board. Animations
+   are kept gentle so 30+ active bubbles don't turn the board into a fairground.
+   Each mood pairs a colored circle backdrop with a piece-state-specific
+   motion: stressed wobbles, hero bobs up, guard pulses, sleep drifts. */
+.mood-glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 20px;
+  line-height: 1;
+  border-radius: 9999px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+.dark .mood-glyph {
+  background: rgba(38, 36, 33, 0.85);
+}
+
+/* Bigger glyph on bigger boards — chessground squares scale with the wrap,
+   so we let the bubble follow at ~25% of square size. */
+@media (min-width: 640px) {
+  .mood-glyph { font-size: 22px; }
+}
+
+/* HERO — gold ring + gentle bob, like a piece taking a deep breath before
+   pouncing. The ring uses `box-shadow` so it does not affect layout. */
+.mood-hero .mood-glyph {
+  background: linear-gradient(135deg, #fde68a, #f59e0b);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.6), 0 0 8px rgba(245, 158, 11, 0.7);
+  animation: mood-hero-bob 1.5s ease-in-out infinite;
+}
+
+/* STRESSED — red ring + side-to-side wobble. Faster than hero so the eye
+   catches it first; this is the most action-relevant mood. */
+.mood-stressed .mood-glyph {
+  background: linear-gradient(135deg, #fecaca, #ef4444);
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.7), 0 0 8px rgba(239, 68, 68, 0.7);
+  animation: mood-stressed-wobble 0.55s ease-in-out infinite;
+}
+
+/* GUARDING — blue ring + soft pulse. Calm, "I've got your back". */
+.mood-guarding .mood-glyph {
+  background: linear-gradient(135deg, #bfdbfe, #3b82f6);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.6), 0 0 6px rgba(59, 130, 246, 0.55);
+  animation: mood-guard-pulse 1.8s ease-in-out infinite;
+}
+
+/* SLEEPING — purple ring + drift. Slowest of the four — "I'm not doing
+   anything useful, develop me!". */
+.mood-sleeping .mood-glyph {
+  background: linear-gradient(135deg, #ddd6fe, #8b5cf6);
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.45);
+  opacity: 0.85;
+  animation: mood-sleep-drift 2.2s ease-in-out infinite;
+}
+
+@keyframes mood-hero-bob {
+  0%, 100% { transform: translateY(0)    scale(1);    }
+  50%      { transform: translateY(-3px) scale(1.08); }
+}
+
+@keyframes mood-stressed-wobble {
+  0%, 100% { transform: translateX(0)    rotate(0);    }
+  25%      { transform: translateX(-2px) rotate(-7deg); }
+  75%      { transform: translateX(2px)  rotate(7deg);  }
+}
+
+@keyframes mood-guard-pulse {
+  0%, 100% { transform: scale(1);    opacity: 0.95; }
+  50%      { transform: scale(1.12); opacity: 1;    }
+}
+
+@keyframes mood-sleep-drift {
+  0%, 100% { transform: translateY(0)    rotate(-6deg); opacity: 0.75; }
+  50%      { transform: translateY(-2px) rotate(6deg);  opacity: 0.95; }
+}
+
+/* Respect users who prefer reduced motion — kill the loops but keep the
+   colored rings so the information stays available. */
+@media (prefers-reduced-motion: reduce) {
+  .mood-hero .mood-glyph,
+  .mood-stressed .mood-glyph,
+  .mood-guarding .mood-glyph,
+  .mood-sleeping .mood-glyph {
+    animation: none;
+  }
+}

@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Local data — never commit user data, secrets, or downloaded binaries
+data/
+bin/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Env files (only .env.example is committed)
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / OS / agent scratch
+.vscode/
+.idea/
+.claude/
+.DS_Store
+Thumbs.db
+
+# Local launch prep (drafts, OG SVG, video script, GFI bodies) — not user-facing
+docs/launch/
+
+# Test coverage
+coverage/
