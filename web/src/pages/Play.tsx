@@ -660,7 +660,8 @@ export default function Play() {
         setPreviewing(false);
         // A paused tournament freezes the board: the move was refused because
         // the admin paused, not because it was illegal.
-        if (msg.message === 'tournament_paused' || msg.message === 'tournament paused') setPaused(true);
+        // TODO
+        // if (msg.message === 'tournament_paused' || msg.message === 'tournament paused') setPaused(true);
         break;
     }
   }
