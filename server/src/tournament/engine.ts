@@ -215,6 +215,9 @@ export function pauseTournament(tournamentId: number): boolean {
   if (tournament.paused) return false;
   if (tournament.status !== 'open' && tournament.status !== 'running') return false;
   db.prepare('UPDATE tournaments SET paused = 1 WHERE id = ?').run(tournamentId);
+  // Open a pause interval: the clocks stop counting from this moment.
+  db.prepare('INSERT INTO tournament_pauses (tournament_id, started_at) VALUES (?, ?)')
+    .run(tournamentId, nowIso());
   return true;
 }
 
@@ -223,7 +226,47 @@ export function resumeTournament(tournamentId: number): boolean {
   if (!tournament) return false;
   if (!tournament.paused) return false;
   db.prepare('UPDATE tournaments SET paused = 0 WHERE id = ?').run(tournamentId);
+  // Close the open interval. Anything that charged wall time during it will
+  // subtract the span, so a three-day pause costs nobody three days.
+  db.prepare('UPDATE tournament_pauses SET ended_at = ? WHERE tournament_id = ? AND ended_at IS NULL')
+    .run(nowIso(), tournamentId);
   return true;
+}
+
+/**
+ * How much of [sinceMs, untilMs] this match spent paused.
+ *
+ * Wall time charged to a clock must skip the pause: a family cup paused from
+ * Friday evening to Sunday morning gives back those two nights, not the whole
+ * weekend. An open pause (ended_at IS NULL) counts up to `untilMs`, so a clock
+ * read *during* a pause is already frozen.
+ */
+export function pausedOverlapMs(matchId: number, sinceMs: number, untilMs: number): number {
+  if (!(untilMs > sinceMs)) return 0;
+  const row = db.prepare(
+    'SELECT tournament_id FROM tournament_matches WHERE id = ?',
+  ).get(matchId) as { tournament_id: number } | undefined;
+  if (!row) return 0;
+  const spans = db.prepare(
+    'SELECT started_at, ended_at FROM tournament_pauses WHERE tournament_id = ?',
+  ).all(row.tournament_id) as { started_at: string; ended_at: string | null }[];
+  let total = 0;
+  for (const span of spans) {
+    const start = Date.parse(span.started_at);
+    const end = span.ended_at ? Date.parse(span.ended_at) : untilMs;
+    if (!Number.isFinite(start)) continue;
+    const lo = Math.max(start, sinceMs);
+    const hi = Math.min(Number.isFinite(end) ? end : untilMs, untilMs);
+    if (hi > lo) total += hi - lo;
+  }
+  return total;
+}
+
+/** Wall time actually played: elapsed minus whatever pause it overlapped. */
+export function chargedElapsedMs(matchId: number | null, sinceMs: number, untilMs: number): number {
+  const elapsed = untilMs - sinceMs;
+  if (matchId === null || elapsed <= 0) return Math.max(0, elapsed);
+  return Math.max(0, elapsed - pausedOverlapMs(matchId, sinceMs, untilMs));
 }
 
 /** Is this tournament frozen right now? */

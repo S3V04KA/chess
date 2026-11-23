@@ -1364,6 +1364,7 @@
     "paused": "Pausiert",
     "pausedNotice": "Das Turnier ist pausiert. Die Partien warten an ihrer Stelle — der Admin setzt fort, wenn es Zeit zum Spielen ist.",
     "pausedBanner": "Turnier pausiert — das Brett steht still, bis der Admin fortsetzt.",
-    "errPaused": "Dieses Turnier ist pausiert."
+    "errPaused": "Dieses Turnier ist pausiert.",
+    "errCannotResume": "Dieses Turnier kann gerade nicht fortgesetzt werden."
   }
 }

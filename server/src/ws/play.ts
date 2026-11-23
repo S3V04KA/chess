@@ -15,7 +15,7 @@ import { GLICKO_DEFAULTS, inflateRd, updatePair } from '../chess/glicko.js';
 import type { AuthedUser, Difficulty, Classification } from '../types.js';
 import { notifyUser } from './lobby.js';
 import { startFromPosition, startFenOf } from '../chess/startFen.js';
-import { reportBotMatchResult, reportMatchResult, tournamentBotMatchSettings, isMatchPaused } from '../tournament/engine.js';
+import { reportBotMatchResult, reportMatchResult, tournamentBotMatchSettings, isMatchPaused, chargedElapsedMs } from '../tournament/engine.js';
 
 // `Skill Level` alone produces tiers that don't match their labels — at
 // `Skill 3 / depth 4`, "Beginner" already plays around 1400 Elo, so a
@@ -473,7 +473,7 @@ async function handleBotConnection(ws: WebSocket, user: AuthedUser) {
         if (turn !== expected) { send(ws, 'error', { message: 'not your turn' }); return; }
 
         if (session.timeControl) {
-          const elapsed = Date.now() - session.lastMoveAt;
+          const elapsed = chargedElapsedMs(session.tournamentMatchId, session.lastMoveAt, Date.now());
           if (turn === 'w') session.whiteTimeMs -= elapsed; else session.blackTimeMs -= elapsed;
           if ((turn === 'w' ? session.whiteTimeMs : session.blackTimeMs) <= 0) {
             await endBotGame(ws, session, turn === 'w' ? '0-1' : '1-0', 'time');
@@ -587,7 +587,7 @@ async function playBotMove(ws: WebSocket, session: BotSession) {
   });
   if (!uci) return;
   if (session.timeControl) {
-    const elapsed = Date.now() - session.lastMoveAt;
+    const elapsed = chargedElapsedMs(session.tournamentMatchId, session.lastMoveAt, Date.now());
     const turn = session.chess.turn();
     if (turn === 'w') session.whiteTimeMs -= elapsed; else session.blackTimeMs -= elapsed;
     session.lastMoveAt = Date.now();
@@ -754,7 +754,9 @@ async function handlePvpConnection(ws: WebSocket, user: AuthedUser, gameId: numb
       blackMs = tc?.initial ?? 0;
       lastMoveAt = Date.now();
     } else if (tc) {
-      const elapsed = Math.max(0, Date.now() - lastMoveAt);
+      // Same rule as a move: only time actually played is charged, so
+      // reconnecting after a paused weekend does not flag the side to move.
+      const elapsed = chargedElapsedMs(row.tournament_match_id ?? null, lastMoveAt, Date.now());
       if (chess.turn() === 'w') whiteMs = Math.max(0, whiteMs - elapsed);
       else                       blackMs = Math.max(0, blackMs - elapsed);
       lastMoveAt = Date.now();
@@ -834,7 +836,9 @@ async function handlePvpConnection(ws: WebSocket, user: AuthedUser, gameId: numb
         }
 
         if (session.timeControl) {
-          const elapsed = Date.now() - session.lastMoveAt;
+          // Charge only the time actually played — a paused tournament's
+          // nights and working days do not come out of anybody's clock.
+          const elapsed = chargedElapsedMs(session.tournamentMatchId, session.lastMoveAt, Date.now());
           if (turn === 'w') session.whiteTimeMs -= elapsed; else session.blackTimeMs -= elapsed;
           if ((turn === 'w' ? session.whiteTimeMs : session.blackTimeMs) <= 0) {
             await endPvpGame(session, turn === 'w' ? '0-1' : '1-0', 'time');

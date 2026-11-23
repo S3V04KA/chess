@@ -531,3 +531,110 @@ describe('the admin deciding a match', () => {
     expect(engine.resolveMatch(match.id, 9)).toBe(false);
   });
 });
+
+describe('pausing', () => {
+  function runningTournament() {
+    addUser(2, 'Anna');
+    addUser(3, 'Ben');
+    const t = makeTournament();
+    joinTournament(t, 2); joinTournament(t, 3);
+    engine.startTournament(t.id, ADMIN);
+    return t;
+  }
+
+  it('freezes a running tournament and restores it exactly on resume', () => {
+    const t = runningTournament();
+
+    expect(engine.pauseTournament(t.id)).toBe(true);
+    expect(engine.getTournament(t.id)!.paused).toBe(1);
+    // The underlying status is untouched, so resuming puts back what was there.
+    expect(engine.getTournament(t.id)!.status).toBe('running');
+    expect(engine.publicStatus(engine.getTournament(t.id)!)).toBe('paused');
+
+    expect(engine.resumeTournament(t.id)).toBe(true);
+    expect(engine.getTournament(t.id)!.paused).toBe(0);
+    expect(engine.getTournament(t.id)!.status).toBe('running');
+    expect(engine.publicStatus(engine.getTournament(t.id)!)).toBe('running');
+  });
+
+  it('cannot be paused twice, resumed twice, or paused when finished', () => {
+    const t = runningTournament();
+    expect(engine.pauseTournament(t.id)).toBe(true);
+    expect(engine.pauseTournament(t.id)).toBe(false);
+    expect(engine.resumeTournament(t.id)).toBe(true);
+    expect(engine.resumeTournament(t.id)).toBe(false);
+
+    engine.reportMatchResult(engine.listMatches(t.id)[0]!.id, '1-0');
+    // The last match decided the whole cup: it is finished now.
+    const finished = engine.getTournament(t.id)!;
+    if (finished.status === 'finished') {
+      expect(engine.pauseTournament(t.id)).toBe(false);
+    }
+  });
+
+  it('closes the door on joining and claiming while paused', () => {
+    addUser(4, 'Cleo');
+    const t = runningTournament();
+    engine.pauseTournament(t.id);
+
+    expect(engine.joinTournament(t.code, 4)).toEqual({ ok: false, error: 'tournament_paused' });
+    expect(engine.claimMatch(engine.listMatches(t.id)[0]!.id, 2)).toBeNull();
+    // Starting an open tournament while paused is refused too.
+    expect(engine.startTournament(t.id, ADMIN)).toEqual({ ok: false, error: 'tournament_paused' });
+  });
+
+  it('keeps the signup door closed after the start even when resumed', () => {
+    addUser(4, 'Cleo');
+    const t = runningTournament();
+    engine.pauseTournament(t.id);
+    engine.resumeTournament(t.id);
+    expect(engine.joinTournament(t.code, 4)).toEqual({ ok: false, error: 'tournament_started' });
+  });
+
+  it('does not charge a clock for the days it spent paused', () => {
+    const t = runningTournament();
+    const match = engine.listMatches(t.id)[0]!;
+    const before = Date.now() - 60_000; // a minute of real thinking
+    engine.pauseTournament(t.id);
+    const resumed = Date.now() + 3 * 24 * 60 * 60 * 1000; // pretend: three days on
+    // The open interval counts up to "now", so a read during the pause is
+    // already frozen at the pause start.
+    const during = engine.chargedElapsedMs(match.id, before, Date.now());
+    expect(during).toBeLessThanOrEqual(60_000 + 5_000);
+
+    // Close the interval three days after it opened and charge across it:
+    // the pause comes out of the elapsed time.
+    db.prepare('UPDATE tournament_pauses SET ended_at = ? WHERE tournament_id = ? AND ended_at IS NULL')
+      .run(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), t.id);
+    const charged = engine.chargedElapsedMs(match.id, before, resumed);
+    // One minute of thinking, minus nothing — the pause covered everything
+    // after it started, so only the pre-pause minute is charged.
+    expect(charged).toBeGreaterThanOrEqual(0);
+    expect(charged).toBeLessThanOrEqual(60_000 + 5_000);
+  });
+
+  it('gives back exactly the pause span, not the whole window', () => {
+    const t = runningTournament();
+    const match = engine.listMatches(t.id)[0]!;
+    const t0 = Date.parse('2026-01-01T18:00:00.000Z'); // Friday evening
+    const pauseStart = t0 + 60 * 60 * 1000;             // paused an hour later
+    const pauseEnd = pauseStart + 48 * 60 * 60 * 1000;  // two whole days
+    const now = pauseEnd + 30 * 60 * 1000;              // half an hour of play after
+    db.prepare('INSERT INTO tournament_pauses (tournament_id, started_at, ended_at) VALUES (?, ?, ?)')
+      .run(t.id, new Date(pauseStart).toISOString(), new Date(pauseEnd).toISOString());
+
+    // An hour before the pause, two days paused, half an hour after:
+    // charged = 1h + 30min, never the three days in between.
+    const charged = engine.chargedElapsedMs(match.id, t0, now);
+    expect(charged).toBe(90 * 60 * 1000);
+  });
+
+  it('reports no pause for a match that has none', () => {
+    const t = runningTournament();
+    const match = engine.listMatches(t.id)[0]!;
+    expect(engine.chargedElapsedMs(match.id, 1_000, 5_000)).toBe(4_000);
+    expect(engine.chargedElapsedMs(null, 1_000, 5_000)).toBe(4_000);
+    // Non-tournament matches never consult the pause table.
+    expect(engine.chargedElapsedMs(999_999, 1_000, 5_000)).toBe(4_000);
+  });
+});

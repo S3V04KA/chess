@@ -33,6 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are written to SQLite as they happen, and a result that was played but
   never made it into the bracket is re-applied on the next start. If a
   player never shows up, the admin can decide that match by hand.
+- **Pause it between the sittings.** A cup that runs over several days can
+  be frozen with *Pause* and picked up again with *Resume*. While it is
+  paused nobody can join, start a game or move a piece, and the clocks stop
+  with it — the days the tournament stood still are given back to both
+  players, so a weekend pause never flags anybody.
 
 ### Single sign-on (OpenID Connect)
 

@@ -36,10 +36,12 @@ const tournament = (over: Record<string, unknown> = {}) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // happy-dom has no confirm(); the dialog itself is not under test.
+  vi.stubGlobal('confirm', () => true);
   get.mockResolvedValue({ tournaments: [tournament()] });
   post.mockResolvedValue({ ok: true });
 });
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 function renderSection() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -123,5 +125,34 @@ describe('Admin → Tournaments', () => {
 
     const dialog = (await screen.findByText('Turnier bereit')).closest('.card') as HTMLElement;
     expect(dialog.textContent).toContain('nimmt der Link keine neuen Spieler mehr an');
+  });
+
+  it('pauses a running tournament', async () => {
+    get.mockResolvedValue({ tournaments: [tournament({ status: 'running' })] });
+    renderSection();
+
+    // A running tournament can be frozen for the days nobody plays.
+    const pause = await screen.findByRole('button', { name: /Pausieren/ });
+    fireEvent.click(pause);
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/api/admin/tournaments/1/pause', {}));
+  });
+
+  it('offers the way back once the tournament is paused', async () => {
+    get.mockResolvedValue({ tournaments: [tournament({ status: 'paused' })] });
+    renderSection();
+
+    const resume = await screen.findByRole('button', { name: /Fortsetzen/ });
+    fireEvent.click(resume);
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/api/admin/tournaments/1/resume', {}));
+    // And it does not offer to pause again while it is already paused.
+    expect(screen.queryByRole('button', { name: /Pausieren/ })).toBeNull();
+  });
+
+  it('does not offer to pause a finished tournament', async () => {
+    get.mockResolvedValue({ tournaments: [tournament({ status: 'finished' })] });
+    renderSection();
+
+    await screen.findByText('Familienpokal');
+    expect(screen.queryByRole('button', { name: /Pausieren/ })).toBeNull();
   });
 });

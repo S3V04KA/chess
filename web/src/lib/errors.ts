@@ -37,6 +37,9 @@ const CODE_KEYS: Record<string, string> = {
   tournament_started: 'tournament.errStarted',
   tournament_finished: 'tournament.errFinished',
   tournament_cancelled: 'tournament.errCancelled',
+  tournament_paused: 'tournament.errPaused',
+  cannot_pause: 'tournament.errPaused',
+  cannot_resume: 'tournament.errCannotResume',
   not_enough_players: 'tournament.errNotEnoughPlayers',
   no_players: 'tournament.errNoPlayers',
 };

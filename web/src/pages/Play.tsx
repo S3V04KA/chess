@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Flag, Lightbulb, Swords, Bot, Users as UsersIcon, Check, X, Loader2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Radio, Sparkles, FlipVertical2, ListOrdered, Handshake, Undo2, MoreHorizontal, RefreshCw } from 'lucide-react';
+import { Flag, Lightbulb, Swords, Bot, Users as UsersIcon, Check, X, Loader2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Radio, Sparkles, FlipVertical2, ListOrdered, Handshake, Undo2, MoreHorizontal, RefreshCw, Pause } from 'lucide-react';
 import { motion, AnimatePresence, useDragControls, useReducedMotion } from 'framer-motion';
 import { Chess } from 'chess.js';
 import ChessBoard from '../components/ChessBoard';
@@ -113,6 +113,8 @@ interface ServerMsg {
   // preview_result fields
   ok?: boolean;
   eval_after_cp?: number;
+  /** The tournament this game belongs to is paused right now. */
+  tournament_paused?: boolean;
   // opponent_status
   online?: boolean;
 }
@@ -191,6 +193,10 @@ export default function Play() {
   const [opponent, setOpponent] = useState<{ display_name: string; online: boolean } | null>(null);
   const [blunder, setBlunder] = useState<BlunderPreview | null>(null);
   const [previewing, setPreviewing] = useState(false);
+  // A paused tournament freezes the board: the server refuses moves until the
+  // admin resumes. Set from `tournament_paused` on connect, then kept in sync
+  // by the server's refusals; a successful move clears it again.
+  const [paused, setPaused] = useState(false);
   const [gameOverDismissed, setGameOverDismissed] = useState(false);
   const [lastClassifiedMove, setLastClassifiedMove] = useState<{ ply: number; san: string; uci: string; classification: Classification; cp_loss: number; best_san: string | null; fen_before: string } | null>(null);
   const [boardArrows, setBoardArrows] = useState<{ orig: string; dest: string; brush: string }[]>([]);
@@ -344,7 +350,7 @@ export default function Play() {
   // is down: we have no idea what it's really doing until the server says so,
   // and a display that keeps counting a game you aren't connected to is a lie.
   useEffect(() => {
-    if (phase !== 'playing' || tc === 'untimed') return;
+    if (phase !== 'playing' || tc === 'untimed' || paused) return;
     const turn = fen.split(' ')[1] === 'w' ? 'white' : 'black';
     let last = Date.now();
     const id = window.setInterval(() => {
@@ -357,7 +363,7 @@ export default function Play() {
     }, 100);
     tickRef.current = id;
     return () => { if (tickRef.current) clearInterval(tickRef.current); };
-  }, [phase, fen, tc]);
+  }, [phase, fen, tc, paused]);
 
   // Show suggested-move arrow when hint arrives
   useEffect(() => {
@@ -493,6 +499,7 @@ export default function Play() {
         loadHistory(msg.history, startFen, msg.start_fen);
         setDrawOffer(mine(msg.draw_offer ?? undefined));
         setTakeback(mine(msg.takeback_request ?? undefined));
+        setPaused(!!msg.tournament_paused);
         if (!alreadyOver) playSound('game_start');
         break;
       }
@@ -542,6 +549,8 @@ export default function Play() {
         setOpponent((o) => o ? { ...o, online: !!msg.online } : o);
         break;
       case 'move_made': {
+        // The server accepted a move, so the tournament is not paused any more.
+        setPaused(false);
         setPending(null);
         if (msg.fen) setFen(msg.fen);
         if (msg.san && msg.uci) {
@@ -660,8 +669,7 @@ export default function Play() {
         setPreviewing(false);
         // A paused tournament freezes the board: the move was refused because
         // the admin paused, not because it was illegal.
-        // TODO
-        // if (msg.message === 'tournament_paused' || msg.message === 'tournament paused') setPaused(true);
+        if (msg.message === 'tournament_paused' || msg.message === 'tournament paused') setPaused(true);
         break;
     }
   }
@@ -786,7 +794,7 @@ export default function Play() {
   // move that gives check leaves a position chess.js won't continue from, and
   // guessing past that point is fiction.
   const canQueueMore = shadowTurn === userColor && premoves.length < MAX_PREMOVES;
-  const movable = phase === 'playing' && !blunder && !previewing && !isBrowsing
+  const movable = phase === 'playing' && !blunder && !previewing && !isBrowsing && !paused
     && (boardTurn === userColor ? true : canQueueMore);
   const goToLive = () => setBrowseIndex(null);
   const stepBack = () => setBrowseIndex((b) => Math.max(0, (b ?? liveIndex) - 1));
@@ -981,6 +989,13 @@ export default function Play() {
             <div className="mb-2 flex items-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
               <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
               {t('play.reconnecting', { defaultValue: 'Reconnecting… your game is saved.' })}
+            </div>
+          )}
+          {/* The admin paused the tournament: the board waits where it is. */}
+          {paused && phase === 'playing' && (
+            <div className="mb-2 flex items-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
+              <Pause className="h-3.5 w-3.5 shrink-0" />
+              {t('tournament.pausedBanner')}
             </div>
           )}
           {oppDisconnected && (

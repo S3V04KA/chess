@@ -482,6 +482,18 @@ db.exec(`CREATE TABLE IF NOT EXISTS tournament_matches (
 )`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_tournament_matches_tournament ON tournament_matches(tournament_id, round, position)`);
 
+// One row per pause. A tournament paused over a weekend must not spend its
+// players' clocks: when a game charges wall time it subtracts every pause
+// interval it overlaps, and this table is where those intervals live. The
+// currently open pause is the row with ended_at IS NULL.
+db.exec(`CREATE TABLE IF NOT EXISTS tournament_pauses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tournament_id INTEGER NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+  started_at TEXT NOT NULL,
+  ended_at TEXT
+)`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_tournament_pauses_tournament ON tournament_pauses(tournament_id, started_at)`);
+
 // Which tournament a game belongs to. The games stay ordinary games (they show
 // up in the game list and can be reviewed), but this link is what lets the
 // tournament engine see that a match was finished — even if the process died

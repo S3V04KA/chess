@@ -1364,6 +1364,7 @@
     "paused": "Paused",
     "pausedNotice": "The tournament is paused. The games wait where they are — the admin resumes when it is time to play again.",
     "pausedBanner": "Tournament paused — the board is frozen until the admin resumes.",
-    "errPaused": "This tournament is paused."
+    "errPaused": "This tournament is paused.",
+    "errCannotResume": "This tournament cannot be resumed right now."
   }
 }

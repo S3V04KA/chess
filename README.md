@@ -272,8 +272,9 @@ Per-profile settings (language, TTS voice, sound sets, Chess.com / Lichess usern
 5. **Rounds are paired by rating.** The better seed of each pair plays white. When a round has an odd number of players, the leftover one plays Stockfish at the level the admin picked: the bot fills the empty seat, it never knocks anybody out, and the result still counts for the tournament points.
 6. **A draw is replayed** — the same two players, a fresh game, nobody eliminated. A tournament is a knockout, and deciding it by rating instead of by playing would be unfair.
 7. **The score is the tournament's own.** Tournament games do not move anybody's Glicko rating and stay out of the general record; the standings table on the tournament page has the points (1 win, ½ draw).
+8. **Pause it between the sittings.** A cup that runs over several days can be frozen with *Pause*: while it is paused nobody can join, start a game or move a piece — the board waits exactly where it was, and *Resume* puts everything back. The clock does not run during a pause either: the days the tournament stood still are given back to both players, so a weekend pause never flags anybody.
 
-Everything is written to SQLite as it happens, so a crash, a restart or a closed laptop mid-tournament costs nothing: the bracket comes back exactly as it was. If a player never shows up, the admin can decide that match under *Admin → Users → Tournaments*.
+Everything is written to SQLite as it happens, so a crash, a restart or a closed laptop mid-tournament costs nothing: the bracket comes back exactly as it was. If a player never shows up, the admin can decide that match under *Admin → Tournaments*.
 
 ## How move classification works
 

@@ -865,6 +865,7 @@
     "paused": "En pausa",
     "pausedNotice": "El torneo está en pausa. Las partidas esperan donde estaban: el admin lo reanuda cuando toque jugar.",
     "pausedBanner": "Torneo en pausa: el tablero está congelado hasta que el admin lo reanude.",
-    "errPaused": "Este torneo está en pausa."
+    "errPaused": "Este torneo está en pausa.",
+    "errCannotResume": "Este torneo no puede reanudarse ahora mismo."
   }
 }
