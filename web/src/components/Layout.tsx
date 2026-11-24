@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LogOut, Home, Swords, BookOpen, Settings as SettingsIcon, Users, Server, Menu, X, BarChart3, Target, Search, Keyboard, BookMarked, ListChecks, Microscope, ChevronDown, GraduationCap, Trophy } from 'lucide-react';
+import { LogOut, Home, Swords, BookOpen, Settings as SettingsIcon, Users, Server, Menu, X, BarChart3, Target, Search, Keyboard, BookMarked, ListChecks, Microscope, ChevronDown, GraduationCap, Trophy, Shield } from 'lucide-react';
 import { api } from '../api';
 import UpdateNotice from './UpdateNotice';
 import { useAuth } from '../state/auth';
@@ -149,6 +149,7 @@ export default function Layout({ onOpenPalette, onOpenShortcuts }: LayoutProps) 
             <NavPill to="/openings" icon={BookMarked} label={t('openings.nav', { defaultValue: 'Openings' })} />
             <NavPill to="/plan" icon={ListChecks} label={t('plan.nav', { defaultValue: 'Plan' })} />
             <NavPill to="/players" icon={Users} label={t('players.nav', { defaultValue: 'Players' })} />
+            <NavPill to="/arenas" icon={Shield} label={t('arena.title')} />
             <NavPill to="/tournaments" icon={Trophy} label={t('tournament.nav', { defaultValue: 'Tournaments' })} />
             <NavPill to="/lab" icon={Microscope} label={t('lab.nav', { defaultValue: 'Lab' })} />
             {user?.role === 'admin' && (
@@ -338,6 +339,7 @@ export default function Layout({ onOpenPalette, onOpenShortcuts }: LayoutProps) 
               <MobileNavItem to="/openings" icon={BookMarked} label={t('openings.nav', { defaultValue: 'Openings' })} />
               <MobileNavItem to="/plan" icon={ListChecks} label={t('plan.nav', { defaultValue: 'Plan' })} />
               <MobileNavItem to="/players" icon={Users} label={t('players.nav', { defaultValue: 'Players' })} />
+              <MobileNavItem to="/arenas" icon={Shield} label={t('arena.title')} />
               <MobileNavItem to="/tournaments" icon={Trophy} label={t('tournament.nav', { defaultValue: 'Tournaments' })} />
               <MobileNavItem to="/lab" icon={Microscope} label={t('lab.nav', { defaultValue: 'Lab' })} />
               <MobileNavItem to="/settings" icon={SettingsIcon} label={t('common.settings')} />

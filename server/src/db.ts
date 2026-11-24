@@ -494,6 +494,60 @@ db.exec(`CREATE TABLE IF NOT EXISTS tournament_pauses (
 )`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_tournament_pauses_tournament ON tournament_pauses(tournament_id, started_at)`);
 
+// Arenas: open, always-running PvP with matchmaking. Similar structure to
+// tournaments but simplified — no rounds/brackets, just a persistent room
+// where players join and play instantly. Points are 2/1/0 (win/draw/loss).
+db.exec(`CREATE TABLE IF NOT EXISTS arenas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  description TEXT,
+  status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','running','paused','closed')),
+  time_control TEXT NOT NULL DEFAULT 'blitz',
+  bot_difficulty TEXT NOT NULL DEFAULT 'medium',
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL,
+  started_at TEXT,
+  closed_at TEXT
+)`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_arenas_status ON arenas(status, created_at DESC)`);
+
+// One row per participant. Points are arena-style: 2 for a win, 1 for a draw,
+// 0 for a loss. `status` tracks whether the player is currently in the arena.
+db.exec(`CREATE TABLE IF NOT EXISTS arena_players (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  arena_id INTEGER NOT NULL REFERENCES arenas(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  points INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'spectator' CHECK(status IN ('spectator','playing','left')),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+)`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_arena_players_arena ON arena_players(arena_id, status)`);
+
+// One row per match in the arena. The match is active until a game finishes
+// or the player leaves. Games are linked via `games.arena_match_id`.
+db.exec(`CREATE TABLE IF NOT EXISTS arena_matches (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  arena_id INTEGER NOT NULL REFERENCES arenas(id) ON DELETE CASCADE,
+  white_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  black_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','finished')),
+  created_at TEXT NOT NULL,
+  finished_at TEXT
+)`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_arena_matches_arena ON arena_matches(arena_id, status)`);
+
+// Arena pauses (for the owner to freeze the room). While paused, no new matches
+// can be claimed and clocks stop. The arena itself has a `paused` column added below.
+db.exec(`CREATE TABLE IF NOT EXISTS arena_pauses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  arena_id INTEGER NOT NULL REFERENCES arenas(id) ON DELETE CASCADE,
+  started_at TEXT NOT NULL,
+  ended_at TEXT
+)`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_arena_pauses_arena ON arena_pauses(arena_id, started_at)`);
+
 // Which tournament a game belongs to. The games stay ordinary games (they show
 // up in the game list and can be reviewed), but this link is what lets the
 // tournament engine see that a match was finished — even if the process died
@@ -504,6 +558,12 @@ db.exec(`CREATE INDEX IF NOT EXISTS idx_tournament_pauses_tournament ON tourname
 // A bot game in a tournament carries its match id through a reconnect, so a
 // resumed bot game still counts for the bracket it belongs to.
 ensureColumn('live_bot_games', 'tournament_match_id', 'INTEGER');
+
+// Add paused flag to arenas table (separate from status)
+ensureColumn('arenas', 'paused', 'INTEGER NOT NULL DEFAULT 0');
+
+// Link games to arena matches (similar to tournament_match_id)
+ensureColumn('games', 'arena_match_id', 'INTEGER');
 
 // Open signup defaults ON — the operator explicitly wants family members to
 // self-register. Admins can flip it off from the Admin → System console. Seeded
