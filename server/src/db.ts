@@ -572,6 +572,8 @@ db.exec(`CREATE TABLE IF NOT EXISTS arena_players (
   joined_at TEXT NOT NULL,
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 )`);
+
+// Index for arena_players by arena and status
 db.exec(`CREATE INDEX IF NOT EXISTS idx_arena_players_arena ON arena_players(arena_id, status)`);
 
 // One row per match in the arena. The match is active until a game finishes
@@ -585,6 +587,8 @@ db.exec(`CREATE TABLE IF NOT EXISTS arena_matches (
   created_at TEXT NOT NULL,
   finished_at TEXT
 )`);
+
+// Index for arena_matches by arena and status
 db.exec(`CREATE INDEX IF NOT EXISTS idx_arena_matches_arena ON arena_matches(arena_id, status)`);
 
 // Arena pauses (for the owner to freeze the room). While paused, no new matches
@@ -595,6 +599,8 @@ db.exec(`CREATE TABLE IF NOT EXISTS arena_pauses (
   started_at TEXT NOT NULL,
   ended_at TEXT
 )`);
+
+// Index for arena_pauses by arena and start time
 db.exec(`CREATE INDEX IF NOT EXISTS idx_arena_pauses_arena ON arena_pauses(arena_id, started_at)`);
 
 // Which tournament a game belongs to. The games stay ordinary games (they show
