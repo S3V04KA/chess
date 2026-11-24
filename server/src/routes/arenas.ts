@@ -241,6 +241,57 @@ router.post('/matches/:id/report', requireAuth, async (c) => {
   return c.json({ ok: true });
 });
 
+// ---- arena game polling ----
+
+router.get('/matches/:matchId/game', requireAuth, (c) => {
+  const me = c.get('user');
+  const matchId = Number(c.req.param('matchId'));
+  if (!Number.isInteger(matchId) || matchId <= 0) return c.json({ error: 'invalid_id' }, 400);
+
+  const match = getMatch(matchId);
+  if (!match) return c.json({ error: 'not_found' }, 404);
+
+  // Get the game by external_id (arena_{matchId})
+  const game = db.prepare('SELECT start_fen, pgn FROM games WHERE external_id = ? AND user_id = ?')
+    .get(`arena_${matchId}`, me.id) as { start_fen: string; pgn: string } | undefined;
+  
+  if (!game) return c.json({ error: 'not_found' }, 404);
+
+  // Parse FEN and get last move
+  let fen = game.start_fen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+  if (game.pgn) {
+    try {
+      const { Chess } = require('chess.js');
+      const chess = new Chess();
+      chess.loadPgn(game.pgn, { strict: false });
+      fen = chess.fen();
+    } catch (err) {
+      console.error('Failed to parse PGN:', err);
+    }
+  }
+
+  // Get last move from PGN
+  let lastMove: [string, string] | null = null;
+  if (game.pgn) {
+    try {
+      const { Chess } = require('chess.js');
+      const chess = new Chess();
+      chess.loadPgn(game.pgn, { strict: false });
+      const moves = chess.history();
+      if (moves.length >= 2) {
+        lastMove = [moves[moves.length - 2], moves[moves.length - 1]];
+      }
+    } catch (err) {
+      console.error('Failed to parse PGN for last move:', err);
+    }
+  }
+
+  return c.json({
+    fen,
+    last_move: lastMove || undefined,
+  });
+});
+
 // ---- shaping ----
 
 function shapeMatch(m: ArenaMatchRow, viewerId: number) {
@@ -265,10 +316,13 @@ function shapeMatch(m: ArenaMatchRow, viewerId: number) {
 
   return {
     id: m.id,
+    white_user_id: m.white_user_id,
+    black_user_id: m.black_user_id,
     white: side(m.white_user_id, m.white_is_bot),
     black: side(m.black_user_id, m.black_is_bot),
     result: m.result,
     status: m.status,
+    is_bot_match: m.white_is_bot || m.black_is_bot ? 1 : 0,
     game_id: gameId,
     my_color: m.white_user_id === viewerId ? 'white' : m.black_user_id === viewerId ? 'black' : null,
   };

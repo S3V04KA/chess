@@ -200,6 +200,8 @@ export interface ArenaPlayer {
 
 export interface ArenaMatch {
   id: number;
+  white_user_id: number | null;
+  black_user_id: number | null;
   white: MatchSide | null;
   black: MatchSide | null;
   result: '1-0' | '0-1' | '1/2-1/2' | null;
