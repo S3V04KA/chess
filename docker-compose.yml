@@ -10,7 +10,7 @@ services:
     restart: unless-stopped
     
     # Apply migrations on startup before starting the server
-    command: /app/docker-entrypoint.sh node dist/index.js
+    command: /app/docker-entrypoint.sh node server/dist/index.js
 
     environment:
       NODE_ENV: production
