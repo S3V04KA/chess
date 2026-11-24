@@ -126,7 +126,7 @@ const SCHEMA = [
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     points INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'spectator' CHECK(status IN ('spectator','playing','left')),
-    created_at TEXT NOT NULL,
+    joined_at TEXT NOT NULL,
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
   `CREATE TABLE IF NOT EXISTS arena_matches (
@@ -569,7 +569,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS arena_players (
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   points INTEGER NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'spectator' CHECK(status IN ('spectator','playing','left')),
-  created_at TEXT NOT NULL,
+  joined_at TEXT NOT NULL,
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 )`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_arena_players_arena ON arena_players(arena_id, status)`);
