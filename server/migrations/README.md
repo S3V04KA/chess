@@ -1,17 +1,21 @@
 # Arena Database Migrations
 
-Эти миграции можно безопасно применять на продакшен сервере без потери данных.
+⚠️ **WARNING**: These migrations will DROP existing arena tables and recreate them with correct schema. 
+This will result in loss of arena participant data, but preserves other database data.
 
 ## Миграции
 
 ### 001_arena_players.sql
-Создает таблицу `arena_players` для отслеживания участников арен с системой очков (2/1/0 за победу/ничью/поражение).
+Создает таблицу `arena_players` с правильной схемой (`joined_at` вместо `created_at`).
+**ВНИМАНИЕ**: Удаляет существующую таблицу перед созданием!
 
 ### 002_arena_matches.sql
-Создает таблицу `arena_matches` для отслеживания активных матчей между игроками в аренах.
+Создает таблицу `arena_matches` для отслеживания активных матчей.
+**ВНИМАНИЕ**: Удаляет существующую таблицу перед созданием!
 
 ### 003_arena_pauses.sql
 Создает таблицу `arena_pauses` для отслеживания пауз арен.
+**ВНИМАНИЕ**: Удаляет существующую таблицу перед созданием!
 
 ### 004_arenas_paused_column.sql
 Добавляет колонку `paused` к таблице `arenas`.
@@ -23,46 +27,31 @@
 
 ## Применение миграций на продакшене
 
-### Способ 1: Автоматически (рекомендуется)
-Просто перезапустите сервер после обновления кода. Миграции из `ensureColumn()` применятся автоматически при старте.
+### Автоматически (рекомендуется)
+Миграции применяются автоматически при каждом запуске Docker контейнера через `docker-entrypoint.sh`.
 
 ```bash
-cd server
-node dist/index.js
+# Пересоберите образ с новыми миграциями
+docker-compose build --no-cache chess
+
+# Перезапустите контейнер - миграции применятся автоматически
+docker-compose up -d chess
 ```
 
-Для таблиц `arena_players`, `arena_matches`, `arena_pauses` нужно также обновить SCHEMA в `server/src/db.ts`.
-
-### Способ 2: Вручную через SQLite
-Если нужно применить миграции без перезапуска сервера:
-
-```bash
-cd server
-
-# Применяем все SQL миграции последовательно
-sqlite3 ../data/chess.db < migrations/001_arena_players.sql
-sqlite3 ../data/chess.db < migrations/002_arena_matches.sql
-sqlite3 ../data/chess.db < migrations/003_arena_pauses.sql
-
-# Для колонок paused и arena_match_id нужно использовать ensureColumn() в коде
-# Эти колонки добавятся автоматически при следующем запуске сервера
-```
-
-### Способ 3: Проверка применения миграций
+### Проверка применения миграций
 Проверить, какие таблицы уже созданы:
 
 ```bash
-sqlite3 ../data/chess.db "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%arena%';"
-```
+# Подключитесь к контейнеру
+docker exec -it chess sh
 
-Проверить структуру таблицы:
-
-```bash
-sqlite3 ../data/chess.db ".schema arena_players"
+# Проверьте схему таблицы через Node.js
+node /app/check-schema.js
 ```
 
 ## Примечания
 
-- Все миграции используют `IF NOT EXISTS`, поэтому их можно запускать многократно без ошибок
-- Миграции безопасны для продакшена - данные не теряются
-- Для колонок, добавляемых через `ensureColumn()`, нужно обновить код и перезапустить сервер
+- Миграции удаляют существующие таблицы перед созданием новых
+- Данные участников арен будут потеряны (но это необходимо для исправления схемы)
+- Другие таблицы и данные не затрагиваются
+- Для колонок `paused` и `arena_match_id` используется `ensureColumn()` - они добавятся автоматически при запуске сервера

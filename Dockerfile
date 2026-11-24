@@ -41,9 +41,10 @@ RUN npm ci --omit=dev --workspace=server
 COPY --from=builder /app/server/dist ./server/dist
 COPY --from=builder /app/web/dist ./web/dist
 
-# Copy migrations and entrypoint script (with executable permissions)
+# Copy migrations and entrypoint scripts (with executable permissions)
 COPY server/migrations ./migrations
 COPY server/migrate.js /app/migrate.js
+COPY server/check-schema.js /app/check-schema.js
 COPY --chmod=755 server/docker-entrypoint.sh /app/docker-entrypoint.sh
 
 # CHANGELOG is read at runtime by /api/meta/changelog

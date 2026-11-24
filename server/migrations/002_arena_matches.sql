@@ -1,8 +1,9 @@
 -- Migration: Create arena_matches table
 -- Tracks active matches between players in arenas
--- Safe to run on production database - uses IF NOT EXISTS
 
-CREATE TABLE IF NOT EXISTS arena_matches (
+DROP TABLE IF EXISTS arena_matches;
+
+CREATE TABLE arena_matches (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   arena_id INTEGER NOT NULL REFERENCES arenas(id) ON DELETE CASCADE,
   white_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -13,4 +14,4 @@ CREATE TABLE IF NOT EXISTS arena_matches (
 );
 
 -- Index for efficient queries by arena and status
-CREATE INDEX IF NOT EXISTS idx_arena_matches_arena ON arena_matches(arena_id, status);
+CREATE INDEX idx_arena_matches_arena ON arena_matches(arena_id, status);
