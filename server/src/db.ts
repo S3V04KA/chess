@@ -125,7 +125,7 @@ const SCHEMA = [
     arena_id INTEGER NOT NULL REFERENCES arenas(id) ON DELETE CASCADE,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     points INTEGER NOT NULL DEFAULT 0,
-    status TEXT NOT NULL DEFAULT 'spectator' CHECK(status IN ('spectator','playing','left')),
+    status TEXT NOT NULL DEFAULT 'free' CHECK(status IN ('free','playing','left')),
     joined_at TEXT NOT NULL,
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
