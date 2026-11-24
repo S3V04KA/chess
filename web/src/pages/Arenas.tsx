@@ -1,7 +1,7 @@
 // The arena list page: open PvP matchmaking where players join and play immediately.
 // Points are awarded 2/1/0 (win/draw/loss). Only admins can create arenas.
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -30,10 +30,17 @@ export default function Arenas() {
     arenas: ArenaSummary[];
   }
 
-  const { data: arenas } = useQuery<ArenaListResponse | undefined>({
+  const { data: arenas, isLoading, error } = useQuery<ArenaListResponse | undefined>({
     queryKey: ['/api/arenas'],
     enabled: !!user,
   });
+
+  // Debug logging
+  useEffect(() => {
+    if (isLoading) console.log('[Arenas] Loading...');
+    if (error) console.error('[Arenas] Error:', error);
+    if (arenas) console.log('[Arenas] Data:', arenas);
+  }, [isLoading, error, arenas]);
 
   const joinMutation = useMutation({
     mutationFn: (code: string) => api.post(`/api/arenas/code/${code}/join`, {}),
@@ -132,7 +139,13 @@ export default function Arenas() {
         </div>
       )}
 
-      {arenas?.arenas.length === 0 ? (
+      {isLoading && (
+        <p className="card p-8 text-center text-sm text-chesscom-500">
+          Loading arenas...
+        </p>
+      )}
+
+      {!isLoading && arenas?.arenas.length === 0 ? (
         <p className="card p-8 text-center text-sm text-chesscom-500">
           {t('arena.empty')}
         </p>

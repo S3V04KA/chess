@@ -104,9 +104,63 @@ const SCHEMA = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_rating_history_user ON rating_history(user_id, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_rating_history_game ON rating_history(game_id)`,
+
+  // Arenas tables for PvP matchmaking
+  `CREATE TABLE IF NOT EXISTS arenas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    description TEXT,
+    status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','running','paused','closed')),
+    time_control TEXT NOT NULL DEFAULT 'blitz',
+    bot_difficulty TEXT NOT NULL DEFAULT 'medium',
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL,
+    started_at TEXT,
+    closed_at TEXT,
+    paused INTEGER NOT NULL DEFAULT 0
+  )`,
+  `CREATE TABLE IF NOT EXISTS arena_players (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    arena_id INTEGER NOT NULL REFERENCES arenas(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    points INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'spectator' CHECK(status IN ('spectator','playing','left')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
+  `CREATE TABLE IF NOT EXISTS arena_matches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    arena_id INTEGER NOT NULL REFERENCES arenas(id) ON DELETE CASCADE,
+    white_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    black_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','finished')),
+    created_at TEXT NOT NULL,
+    finished_at TEXT
+  )`,
+  `CREATE TABLE IF NOT EXISTS arena_pauses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    arena_id INTEGER NOT NULL REFERENCES arenas(id) ON DELETE CASCADE,
+    started_at TEXT NOT NULL,
+    ended_at TEXT
+  )`,
 ];
 
-for (const stmt of SCHEMA) db.exec(stmt);
+console.log('[db] Starting schema creation...');
+for (const stmt of SCHEMA) {
+  console.log('[db] Executing:', stmt.substring(0, 60));
+  db.exec(stmt);
+}
+console.log('[db] Schema creation complete.');
+
+// Idempotent migration for arena_match_id column
+function ensureArenaMatchId() {
+  const cols = db.prepare(`PRAGMA table_info(games)`).all() as { name: string }[];
+  if (!cols.some((c) => c.name === 'arena_match_id')) {
+    db.exec('ALTER TABLE games ADD COLUMN arena_match_id INTEGER');
+  }
+}
+ensureArenaMatchId();
 
 // Idempotent migrations for existing installs
 function ensureColumn(table: string, col: string, def: string) {

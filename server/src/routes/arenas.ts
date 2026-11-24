@@ -32,6 +32,13 @@ import {
 
 const router = new Hono();
 
+// ---- public: list arenas ----
+
+router.get('/', (c) => {
+  const arenas = listArenas();
+  return c.json({ arenas: arenas.map(summarize) });
+});
+
 // ---- public: arena landing ----
 
 router.get('/code/:code', (c) => {
