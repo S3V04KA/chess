@@ -33,14 +33,11 @@ export default function Arenas() {
   const { data: arenas, isLoading, error } = useQuery<ArenaListResponse | undefined>({
     queryKey: ['/api/arenas'],
     enabled: !!user,
+    queryFn: async () => {
+      const res = await api.get('/api/arenas');
+      return res as ArenaListResponse;
+    },
   });
-
-  // Debug logging
-  useEffect(() => {
-    if (isLoading) console.log('[Arenas] Loading...');
-    if (error) console.error('[Arenas] Error:', error);
-    if (arenas) console.log('[Arenas] Data:', arenas);
-  }, [isLoading, error, arenas]);
 
   const joinMutation = useMutation({
     mutationFn: (code: string) => api.post(`/api/arenas/code/${code}/join`, {}),

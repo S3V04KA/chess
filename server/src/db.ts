@@ -146,12 +146,7 @@ const SCHEMA = [
   )`,
 ];
 
-console.log('[db] Starting schema creation...');
-for (const stmt of SCHEMA) {
-  console.log('[db] Executing:', stmt.substring(0, 60));
-  db.exec(stmt);
-}
-console.log('[db] Schema creation complete.');
+for (const stmt of SCHEMA) db.exec(stmt);
 
 // Idempotent migration for arena_match_id column
 function ensureArenaMatchId() {
