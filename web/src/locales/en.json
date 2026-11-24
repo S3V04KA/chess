@@ -1367,5 +1367,60 @@
     "pausedBanner": "Tournament paused — the board is frozen until the admin resumes.",
     "errPaused": "This tournament is paused.",
     "errCannotResume": "This tournament cannot be resumed right now."
+  },
+  "arena": {
+    "title": "Arena",
+    "subtitle": "Open PvP matchmaking — play now, earn points.",
+    "create": "Create Arena",
+    "namePlaceholder": "Arena name",
+    "descriptionPlaceholder": "Description (optional)",
+    "creating": "Creating…",
+    "empty": "No arenas yet. Be the first to create one!",
+    "copyLink": "Copy link",
+    "status": {
+      "open": "Open",
+      "running": "Running",
+      "paused": "Paused",
+      "closed": "Closed"
+    },
+    "timeControl": {
+      "bullet": "Bullet",
+      "blitz": "Blitz",
+      "rapid": "Rapid",
+      "classical": "Classical",
+      "untimed": "Untimed"
+    },
+    "joinTitle": "Ready to play?",
+    "joinHint": "Join the arena and start playing immediately.",
+    "join": "Join Arena",
+    "joined": "Joined",
+    "closed": "This arena is closed",
+    "closedHint": "It's no longer accepting new players.",
+    "standings": "Leaderboard",
+    "player": "Player",
+    "points": "Points",
+    "state": "State",
+    "myStatus": "Your Status",
+    "freePlayers": "Free Players",
+    "playingPlayers": "Playing",
+    "findMatch": "Find Match",
+    "matchmaking": "Finding match…",
+    "leave": "Leave Arena",
+    "pause": "Pause Arena",
+    "resume": "Resume Arena",
+    "close": "Close Arena",
+    "paused": "Arena Paused",
+    "pausedNotice": "No new matches can be created until resumed.",
+    "playerStatus": {
+      "free": "Free",
+      "playing": "Playing",
+      "spectating": "Spectating"
+    },
+    "recentMatches": "Recent Matches",
+    "matchStatus": {
+      "pending": "Pending",
+      "active": "Active",
+      "finished": "Finished"
+    }
   }
 }

@@ -32,6 +32,7 @@ import { attachPlayWebSocket } from './ws/play.js';
 import { attachLobbyWebSocket } from './ws/lobby.js';
 import { prepareSsoOnlyFirstRun, warnIfNoPublicBaseUrl } from './auth/oidc.js';
 import { recoverTournaments } from './tournament/engine.js';
+import arenasRoutes from './routes/arenas.js';
 
 const app = new Hono();
 app.use('*', logger());
@@ -111,6 +112,7 @@ app.route('/api/openings', openingsRoutes);
 app.route('/api/plan', planRoutes);
 app.route('/api/achievements', achievementsRoutes);
 app.route('/api/learn', learnRoutes);
+app.route('/api/arenas', arenasRoutes);
 
 // In production, serve the built web app
 import { existsSync, readFileSync } from 'node:fs';

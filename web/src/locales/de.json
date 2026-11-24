@@ -1367,5 +1367,60 @@
     "pausedBanner": "Turnier pausiert — das Brett steht still, bis der Admin fortsetzt.",
     "errPaused": "Dieses Turnier ist pausiert.",
     "errCannotResume": "Dieses Turnier kann gerade nicht fortgesetzt werden."
+  },
+  "arena": {
+    "title": "Arena",
+    "subtitle": "Offenes PvP-Matchmaking — jetzt spielen, Punkte sammeln.",
+    "create": "Arena erstellen",
+    "namePlaceholder": "Arenaname",
+    "descriptionPlaceholder": "Beschreibung (optional)",
+    "creating": "Erstelle…",
+    "empty": "Noch keine Arenen. Sei der Erste!",
+    "copyLink": "Link kopieren",
+    "status": {
+      "open": "Offen",
+      "running": "Läuft",
+      "paused": "Pausiert",
+      "closed": "Geschlossen"
+    },
+    "timeControl": {
+      "bullet": "Bullet",
+      "blitz": "Blitz",
+      "rapid": "Rapid",
+      "classical": "Klassisch",
+      "untimed": "Unbegrenzt"
+    },
+    "joinTitle": "Bereit zu spielen?",
+    "joinHint": "Tritt der Arena bei und spiele sofort los.",
+    "join": "Arena beitreten",
+    "joined": "Beigetreten",
+    "closed": "Diese Arena ist geschlossen",
+    "closedHint": "Sie akzeptiert keine neuen Spieler mehr.",
+    "standings": "Tabelle",
+    "player": "Spieler",
+    "points": "Punkte",
+    "state": "Status",
+    "myStatus": "Dein Status",
+    "freePlayers": "Freie Spieler",
+    "playingPlayers": "Spielen",
+    "findMatch": "Gegner finden",
+    "matchmaking": "Suche Gegner…",
+    "leave": "Arena verlassen",
+    "pause": "Arena pausieren",
+    "resume": "Arena fortsetzen",
+    "close": "Arena schließen",
+    "paused": "Arena pausiert",
+    "pausedNotice": "Keine neuen Partien möglich bis zur Fortsetzung.",
+    "playerStatus": {
+      "free": "Frei",
+      "playing": "Spielt",
+      "spectating": "Zuschaut"
+    },
+    "recentMatches": "Letzte Partien",
+    "matchStatus": {
+      "pending": "Ausstehend",
+      "active": "Aktiv",
+      "finished": "Beendet"
+    }
   }
 }

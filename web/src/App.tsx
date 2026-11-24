@@ -30,6 +30,8 @@ import TournamentJoin from './pages/TournamentJoin';
 import AdminUsers from './pages/admin/Users';
 import AdminSystem from './pages/admin/System';
 import AdminTournaments from './pages/admin/Tournaments';
+import Arenas from './pages/Arenas';
+import Arena from './pages/Arena';
 
 import IncomingChallengeModal from './components/IncomingChallengeModal';
 import CommandPalette from './components/CommandPalette';
@@ -204,6 +206,8 @@ export default function App() {
           <Route path="/players/:id" element={<PlayerProfile />} />
           <Route path="/tournaments" element={<Tournaments />} />
           <Route path="/tournaments/:id" element={<Tournament />} />
+          <Route path="/arenas" element={<Arenas />} />
+          <Route path="/arenas/:code" element={<Arena />} />
           <Route path="/settings" element={<SettingsPage />} />
           {user.role === 'admin' && <Route path="/admin/users" element={<AdminUsers />} />}
           {user.role === 'admin' && <Route path="/admin/tournaments" element={<AdminTournaments />} />}

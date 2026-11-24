@@ -868,5 +868,60 @@
     "pausedBanner": "Torneo en pausa: el tablero está congelado hasta que el admin lo reanude.",
     "errPaused": "Este torneo está en pausa.",
     "errCannotResume": "Este torneo no puede reanudarse ahora mismo."
+  },
+  "arena": {
+    "title": "Arena",
+    "subtitle": " matchmaking PvP abierto — juega ahora, gana puntos.",
+    "create": "Crear arena",
+    "namePlaceholder": "Nombre de la arena",
+    "descriptionPlaceholder": "Descripción (opcional)",
+    "creating": "Creando…",
+    "empty": "Aún no hay arenas. ¡Sé el primero!",
+    "copyLink": "Copiar enlace",
+    "status": {
+      "open": "Abierta",
+      "running": "En curso",
+      "paused": "Pausada",
+      "closed": "Cerrada"
+    },
+    "timeControl": {
+      "bullet": "Bala",
+      "blitz": "Relámpago",
+      "rapid": "Rápido",
+      "classical": "Clásico",
+      "untimed": "Sin tiempo"
+    },
+    "joinTitle": "¿Listo para jugar?",
+    "joinHint": "Únete a la arena y empieza a jugar inmediatamente.",
+    "join": "Unirse a la arena",
+    "joined": "Unido",
+    "closed": "Esta arena está cerrada",
+    "closedHint": "Ya no acepta nuevos jugadores.",
+    "standings": "Tabla de clasificación",
+    "player": "Jugador",
+    "points": "Puntos",
+    "state": "Estado",
+    "myStatus": "Tu estado",
+    "freePlayers": "Jugadores libres",
+    "playingPlayers": "Jugando",
+    "findMatch": "Encontrar rival",
+    "matchmaking": "Buscando rival…",
+    "leave": "Salir de la arena",
+    "pause": "Pausar arena",
+    "resume": "Reanudar",
+    "close": "Cerrar arena",
+    "paused": "Arena pausada",
+    "pausedNotice": "No se pueden crear nuevas partidas hasta reanudar.",
+    "playerStatus": {
+      "free": "Libre",
+      "playing": "Jugando",
+      "spectating": "Espectador"
+    },
+    "recentMatches": "Partidas recientes",
+    "matchStatus": {
+      "pending": "Pendiente",
+      "active": "Activa",
+      "finished": "Terminada"
+    }
   }
 }

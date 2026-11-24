@@ -171,3 +171,45 @@ export interface TournamentDetail {
   rounds: TournamentRound[];
   my_matches: TournamentMatch[];
 }
+
+// ---- Arenas ----
+
+export type ArenaStatus = 'open' | 'running' | 'paused' | 'closed';
+export type ArenaPlayerStatus = 'free' | 'playing' | 'spectating';
+
+export interface ArenaSummary {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+  status: ArenaStatus;
+  time_control: string;
+  participants: number;
+  created_at: string;
+  created_by: number;
+}
+
+export interface ArenaPlayer {
+  user_id: number;
+  display_name: string;
+  avatar_emoji: string;
+  username: string;
+  points: number;
+  status: ArenaPlayerStatus;
+}
+
+export interface ArenaMatch {
+  id: number;
+  white: MatchSide | null;
+  black: MatchSide | null;
+  result: '1-0' | '0-1' | '1/2-1/2' | null;
+  status: 'pending' | 'active' | 'finished';
+  is_bot_match: boolean;
+  game_id: number | null;
+}
+
+export interface ArenaDetail {
+  arena: ArenaSummary;
+  players: ArenaPlayer[];
+  matches: ArenaMatch[];
+}
