@@ -845,6 +845,7 @@
     "status": {
       "open": "Esperando el inicio",
       "running": "En curso",
+      "paused": "En pausa",
       "finished": "Terminado",
       "cancelled": "Cancelado"
     },

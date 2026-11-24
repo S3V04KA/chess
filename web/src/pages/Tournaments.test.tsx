@@ -176,6 +176,56 @@ describe('the tournament page', () => {
     await waitFor(() => expect(post).toHaveBeenCalledWith('/api/tournaments/matches/13/claim'));
   });
 
+  it('draws the rounds as columns and joins the pairings with lines', async () => {
+    const semi = {
+      id: 21, round: 2, position: 0, white: side('Anna', 1), black: null,
+      result: null, status: 'pending', is_bot_match: false, game_id: null, my_color: null,
+    };
+    get.mockResolvedValue({
+      ...detail,
+      rounds: [
+        { round: 1, matches: detail.rounds[0]!.matches },
+        { round: 2, matches: [semi] },
+      ],
+      my_matches: [],
+    });
+    const { container } = renderTournament();
+
+    expect(await screen.findByText('Runde 1')).toBeTruthy();
+    expect(screen.getByText('Runde 2')).toBeTruthy();
+    // Two lines out of the first round, both meeting in the second: the
+    // bracket is a tree, not a stack of lists.
+    await waitFor(() => {
+      const paths = container.querySelectorAll('[data-testid="bracket-lines"] path');
+      expect(paths.length).toBe(2);
+    });
+    // The second-round pairing sits in the second column, halfway between the
+    // two pairings it is fed by.
+    const finalCard = [...container.querySelectorAll('[style*="left"]')]
+      .find((el) => el.getAttribute('style')?.includes('left: 312px'));
+    expect(finalCard).toBeTruthy();
+  });
+
+  it('shows the tournament points as 2 / 1 / 0', async () => {
+    get.mockResolvedValue({
+      ...detail,
+      players: [
+        { user_id: 1, display_name: 'Anna', avatar_emoji: '♟', username: 'anna', seed: 1, points: 3, status: 'joined' },
+        { user_id: 3, display_name: 'Cleo', avatar_emoji: '♛', username: 'cleo', seed: 3, points: 1, status: 'joined' },
+      ],
+    });
+    renderTournament();
+
+    expect(await screen.findByText('Tabelle')).toBeTruthy();
+    const table = screen.getByRole('table');
+    const row = (name: string) => within(table).getByText(name).closest('tr')!;
+    // A win is 2, a draw 1, a loss 0 — the column shows the score itself,
+    // never a half point.
+    expect(within(row('Anna')).getByText('3')).toBeTruthy();
+    expect(within(row('Cleo')).getByText('1')).toBeTruthy();
+    expect(document.body.textContent).not.toContain('1,5');
+  });
+
   it('waits for the admin before the bracket appears', async () => {
     get.mockResolvedValue({
       ...detail,

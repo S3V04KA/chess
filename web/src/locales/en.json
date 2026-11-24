@@ -1344,6 +1344,7 @@
     "status": {
       "open": "Waiting for the start",
       "running": "Running",
+      "paused": "Paused",
       "finished": "Finished",
       "cancelled": "Cancelled"
     },

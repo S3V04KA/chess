@@ -278,7 +278,7 @@ describe('results', () => {
     const players = engine.listPlayers(t.id);
     const winner = players.find((p) => p.user_id === match.white_user_id)!;
     const loser = players.find((p) => p.user_id === match.black_user_id)!;
-    expect(winner.points).toBe(1);
+    expect(winner.points).toBe(2);
     expect(winner.status).toBe('joined');
     expect(loser.points).toBe(0);
     expect(loser.status).toBe('eliminated');
@@ -293,16 +293,22 @@ describe('results', () => {
     expect(row.rated).toBe(0);
   });
 
-  it('replays a draw instead of eliminating anybody', () => {
+  it('replays a draw instead of eliminating anybody, and scores it 1–1', () => {
     const { t, match } = twoPlayerTournament();
     engine.reportMatchResult(match.id, '1/2-1/2');
 
     const players = engine.listPlayers(t.id);
     expect(players.every((p) => p.status === 'joined')).toBe(true);
-    expect(players.every((p) => p.points === 0)).toBe(true);
+    expect(players.every((p) => p.points === 1)).toBe(true);
     // A fresh game was set up for the replay.
     expect(engine.listMatches(t.id)[0]!.status).toBe('active');
     expect(db.prepare('SELECT COUNT(*) c FROM games').get()).toEqual({ c: 2 });
+
+    // The replay is decided: the points of both games add up (2 + 1 vs 1).
+    engine.reportMatchResult(match.id, '1-0');
+    const after = engine.listPlayers(t.id);
+    expect(after.find((p) => p.user_id === match.white_user_id)!.points).toBe(3);
+    expect(after.find((p) => p.user_id === match.black_user_id)!.points).toBe(1);
   });
 
   it('is idempotent — the same result twice changes nothing', () => {
@@ -310,7 +316,7 @@ describe('results', () => {
     engine.reportMatchResult(match.id, '1-0');
     engine.reportMatchResult(match.id, '1-0');
     const players = engine.listPlayers(t.id);
-    expect(players.reduce((sum, p) => sum + p.points, 0)).toBe(1);
+    expect(players.reduce((sum, p) => sum + p.points, 0)).toBe(2);
   });
 
   it('advances the winner into the next round', () => {
@@ -382,7 +388,7 @@ describe('the bot match', () => {
     const { t, botMatch } = botTournament();
     engine.reportBotMatchResult(botMatch.id, 'win');
     const humanId = botMatch.white_is_bot === 1 ? botMatch.black_user_id : botMatch.white_user_id;
-    expect(engine.listPlayers(t.id).find((p) => p.user_id === humanId)!.points).toBe(1);
+    expect(engine.listPlayers(t.id).find((p) => p.user_id === humanId)!.points).toBe(2);
   });
 
   it('gives the client the admin\'s settings, not the client\'s', () => {
@@ -416,7 +422,7 @@ describe('recovery', () => {
 
     engine.recoverTournaments();
     const players = engine.listPlayers(t.id);
-    expect(players.find((p) => p.user_id === match.white_user_id)!.points).toBe(1);
+    expect(players.find((p) => p.user_id === match.white_user_id)!.points).toBe(2);
     expect(players.find((p) => p.user_id === match.black_user_id)!.status).toBe('eliminated');
   });
 
@@ -430,7 +436,7 @@ describe('recovery', () => {
     engine.reportMatchResult(match.id, '1-0');
 
     engine.recoverTournaments();
-    expect(engine.listPlayers(t.id).reduce((sum, p) => sum + p.points, 0)).toBe(1);
+    expect(engine.listPlayers(t.id).reduce((sum, p) => sum + p.points, 0)).toBe(2);
   });
 
   it('re-applies a bot game that was played but never made it into the bracket', () => {
@@ -452,7 +458,7 @@ describe('recovery', () => {
 
     engine.recoverTournaments();
     const human = engine.listPlayers(t.id).find((p) => p.user_id === humanId)!;
-    expect(human.points).toBe(1);
+    expect(human.points).toBe(2);
     // And the bot never eliminated the human.
     expect(human.status).toBe('joined');
   });
@@ -516,7 +522,7 @@ describe('the admin deciding a match', () => {
 
     expect(engine.resolveMatch(match.id, match.black_user_id!)).toBe(true);
     const players = engine.listPlayers(t.id);
-    expect(players.find((p) => p.user_id === match.black_user_id)!.points).toBe(1);
+    expect(players.find((p) => p.user_id === match.black_user_id)!.points).toBe(2);
     expect(players.find((p) => p.user_id === match.white_user_id)!.status).toBe('eliminated');
   });
 

@@ -884,6 +884,7 @@
     "status": {
       "open": "Чака начало",
       "running": "В ход",
+      "paused": "На пауза",
       "finished": "Приключил",
       "cancelled": "Отменен"
     },

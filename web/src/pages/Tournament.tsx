@@ -16,7 +16,7 @@ import { useAuth } from '../state/auth';
 import { useLobby } from '../state/lobby';
 import { humanizeError } from '../lib/errors';
 import { cn } from '../lib/utils';
-import type { TournamentDetail, TournamentMatch, TournamentPlayer } from '../types';
+import type { TournamentDetail, TournamentMatch, TournamentPlayer, TournamentRound } from '../types';
 
 export default function Tournament() {
   const { t } = useTranslation();
@@ -214,24 +214,20 @@ export default function Tournament() {
         </div>
       )}
 
-      {/* The bracket */}
+      {/* The bracket: rounds as columns, pairs joined by the lines that show
+          who plays whom and who moves on. */}
       {rounds.length === 0 ? (
         <p className="card p-8 text-center text-sm text-chesscom-500">{t('tournament.bracketEmpty')}</p>
       ) : (
-        <section className="space-y-4">
-          {rounds.map((r) => (
-            <div key={r.round}>
-              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-chesscom-500">
-                {t('tournament.round', { round: r.round })}
-              </h2>
-              <ul className="grid gap-2 sm:grid-cols-2">
-                {r.matches.map((m) => (
-                  <MatchRow key={m.id} m={m} viewerId={user?.id ?? 0} onPlay={playHuman} onPlayBot={playBot} busy={busyMatch} paused={paused} />
-                ))}
-              </ul>
-            </div>
-          ))}
-        </section>
+        <Bracket
+          rounds={rounds}
+          champion={champion}
+          viewerId={user?.id ?? 0}
+          onPlay={playHuman}
+          onPlayBot={playBot}
+          busy={busyMatch}
+          paused={paused}
+        />
       )}
 
       {/* Standings */}
@@ -250,54 +246,234 @@ export default function Tournament() {
 const STATUS_BADGE: Record<string, string> = {
   open: 'bg-accent-100 text-accent-700',
   running: 'bg-green-500/15 text-green-600',
+  paused: 'bg-amber-500/20 text-amber-700 dark:text-amber-300',
   finished: 'bg-chesscom-100 text-chesscom-600 dark:bg-chesscom-700 dark:text-chesscom-200',
   cancelled: 'bg-bad/10 text-bad',
 };
 
-function MatchRow({
-  m, viewerId, onPlay, onPlayBot, busy, paused,
+// ---- bracket geometry ----
+//
+// One number drives the whole picture: every first-round pairing takes a slot
+// of SLOT pixels, and every later pairing sits exactly halfway between the two
+// pairings whose winners meet in it. That is what makes the bracket read as a
+// tree — the lines between the columns are drawn from the same coordinates.
+const CARD_W = 240;
+const CARD_H = 72;
+const ROW_GAP = 14;
+const SLOT = CARD_H + ROW_GAP;
+const COL_GAP = 72; // room between two columns for the connector lines
+const HEADER_H = 24;
+
+const colX = (col: number) => col * (CARD_W + COL_GAP);
+
+/** One positioned pairing: which match, which column, which vertical centre. */
+interface BracketNode {
+  m: TournamentMatch;
+  col: number;
+  y: number;
+}
+
+/**
+ * Places every pairing on the canvas. Round 1 stacks its pairings down the
+ * page; a pairing of a later round is centred on the two earlier pairings it
+ * is fed by (match j of round i takes the winners of matches 2j and 2j+1 of
+ * round i-1 — the server pairs the survivors in seed order, which is exactly
+ * that order).
+ */
+function layoutBracket(rounds: TournamentRound[]): BracketNode[][] {
+  let prevCenters: number[] = [];
+  return rounds.map((r, col) => {
+    const nodes = r.matches.map((m, j) => {
+      let y: number;
+      if (col === 0) {
+        y = j * SLOT + CARD_H / 2;
+      } else {
+        const feeders = [prevCenters[j * 2], prevCenters[j * 2 + 1]].filter((v): v is number => v !== undefined);
+        // The last pairing of an odd round hangs on its single feeder (the
+        // other seat belongs to the bot).
+        y = feeders.length > 0
+          ? feeders.reduce((sum, v) => sum + v, 0) / feeders.length
+          : (j + 0.5) * SLOT * 2 ** col;
+      }
+      return { m, col, y };
+    });
+    prevCenters = nodes.map((n) => n.y);
+    return nodes;
+  });
+}
+
+/** The elbow lines from a pairing to the pairing that follows it. */
+function connectorPaths(cols: BracketNode[][]): string[] {
+  const paths: string[] = [];
+  for (let col = 1; col < cols.length; col++) {
+    const prev = cols[col - 1]!;
+    for (const [j, node] of cols[col]!.entries()) {
+      for (const feeder of [prev[j * 2], prev[j * 2 + 1]]) {
+        if (!feeder) continue;
+        const x1 = colX(col - 1) + CARD_W;
+        const x2 = colX(col);
+        const mid = x1 + COL_GAP / 2;
+        paths.push(`M ${x1} ${feeder.y} H ${mid} V ${node.y} H ${x2}`);
+      }
+    }
+  }
+  return paths;
+}
+
+function Bracket({
+  rounds, champion, viewerId, onPlay, onPlayBot, busy, paused,
 }: {
-  m: TournamentMatch; viewerId: number;
-  onPlay: (m: TournamentMatch) => void; onPlayBot: (m: TournamentMatch) => void; busy: number | null;
+  rounds: TournamentRound[];
+  champion: TournamentPlayer | undefined;
+  viewerId: number;
+  onPlay: (m: TournamentMatch) => void;
+  onPlayBot: (m: TournamentMatch) => void;
+  busy: number | null;
   paused: boolean;
 }) {
   const { t } = useTranslation();
+  const cols = useMemo(() => layoutBracket(rounds), [rounds]);
+  const paths = useMemo(() => connectorPaths(cols), [cols]);
+  const champX = colX(rounds.length);
+  const last = cols[cols.length - 1]?.[0];
+  const width = (champion && last ? champX + CARD_W : colX(rounds.length - 1) + CARD_W);
+  const height = Math.max(
+    SLOT,
+    ...cols.flat().map((n) => n.y + CARD_H / 2),
+    champion && last ? last.y + CARD_H / 2 : 0,
+  );
+
+  return (
+    <section className="space-y-2">
+      {/* Round titles sit above their own column. */}
+      <div className="relative overflow-x-auto pb-1">
+        <div className="relative" style={{ width, height: HEADER_H }}>
+          {rounds.map((r, col) => (
+            <h2
+              key={r.round}
+              className="absolute top-0 text-xs font-semibold uppercase tracking-wide text-chesscom-500"
+              style={{ left: colX(col), width: CARD_W }}
+            >
+              {t('tournament.round', { round: r.round })}
+            </h2>
+          ))}
+          {champion && last && (
+            <h2
+              className="absolute top-0 text-xs font-semibold uppercase tracking-wide text-gold-600"
+              style={{ left: champX, width: CARD_W }}
+            >
+              {t('tournament.championBadge')}
+            </h2>
+          )}
+        </div>
+      </div>
+
+      <div className="overflow-x-auto pb-2">
+        <div className="relative" style={{ width, height }}>
+          {/* The lines: drawn first, so the pairings sit on top of them. */}
+          <svg
+            className="pointer-events-none absolute inset-0 text-chesscom-300 dark:text-chesscom-600"
+            width={width}
+            height={height}
+            aria-hidden
+            data-testid="bracket-lines"
+          >
+            {paths.map((d) => (
+              <path key={d} d={d} fill="none" stroke="currentColor" strokeWidth={2} />
+            ))}
+            {champion && last && (
+              <path
+                d={`M ${colX(rounds.length - 1) + CARD_W} ${last.y} H ${champX}`}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+              />
+            )}
+          </svg>
+
+          {cols.flat().map((n) => (
+            <BracketCard
+              key={n.m.id}
+              node={n}
+              viewerId={viewerId}
+              onPlay={onPlay}
+              onPlayBot={onPlayBot}
+              busy={busy}
+              paused={paused}
+            />
+          ))}
+
+          {champion && last && (
+            <div
+              className="absolute flex items-center gap-2 rounded-xl border border-gold-500/40 bg-gold-500/10 px-3"
+              style={{ left: champX, top: last.y - CARD_H / 2, width: CARD_W, height: CARD_H }}
+            >
+              <Trophy className="h-4 w-4 shrink-0 text-gold-600" />
+              <span className="truncate text-sm font-semibold text-gold-700 dark:text-gold-300">
+                {champion.display_name}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** One pairing of the bracket: the two seats, the score, the way to play it. */
+function BracketCard({
+  node, viewerId, onPlay, onPlayBot, busy, paused,
+}: {
+  node: BracketNode;
+  viewerId: number;
+  onPlay: (m: TournamentMatch) => void;
+  onPlayBot: (m: TournamentMatch) => void;
+  busy: number | null;
+  paused: boolean;
+}) {
+  const { t } = useTranslation();
+  const m = node.m;
   const mine = m.white?.user_id === viewerId || m.black?.user_id === viewerId;
   const winner = m.result === '1-0' ? m.white : m.result === '0-1' ? m.black : null;
 
   return (
-    <li className={cn(
-      'flex items-center gap-3 rounded-xl border bg-white px-3 py-2.5 dark:bg-chesscom-800',
-      mine ? 'border-board-dark/40' : 'border-chesscom-200 dark:border-chesscom-700',
-    )}>
-      <Side side={m.white} win={winner?.user_id != null && winner.user_id === m.white?.user_id} />
-      <span className="shrink-0 font-mono text-xs text-chesscom-400">
-        {m.result ?? '–'}
-      </span>
-      <Side side={m.black} win={winner?.user_id != null && winner.user_id === m.black?.user_id} />
-      {m.status !== 'finished' && mine && (
-        <button
-          onClick={() => (m.is_bot_match ? onPlayBot(m) : onPlay(m))}
-          disabled={busy === m.id || paused}
-          className="btn-primary ml-auto shrink-0 px-2 py-1 text-xs"
-          title={paused ? t('tournament.pausedBanner') : undefined}
-        >
-          <Play className="h-3 w-3" /> {paused ? t('tournament.paused') : t('tournament.play')}
-        </button>
+    <div
+      className={cn(
+        'absolute flex items-center gap-2 rounded-xl border bg-white px-3 py-2 shadow-soft dark:bg-chesscom-800',
+        mine ? 'border-board-dark/40 ring-1 ring-board-dark/10' : 'border-chesscom-200 dark:border-chesscom-700',
       )}
-    </li>
+      style={{ left: colX(node.col), top: node.y - CARD_H / 2, width: CARD_W, height: CARD_H }}
+    >
+      <div className="min-w-0 flex-1 space-y-1">
+        <Side side={m.white} win={winner?.user_id != null && winner.user_id === m.white?.user_id} />
+        <Side side={m.black} win={winner?.user_id != null && winner.user_id === m.black?.user_id} />
+      </div>
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        <span className="font-mono text-xs text-chesscom-400">{m.result ?? '–'}</span>
+        {m.status !== 'finished' && mine && (
+          <button
+            onClick={() => (m.is_bot_match ? onPlayBot(m) : onPlay(m))}
+            disabled={busy === m.id || paused}
+            className="btn-primary px-2 py-1 text-xs"
+            title={paused ? t('tournament.pausedBanner') : undefined}
+          >
+            <Play className="h-3 w-3" /> {paused ? t('tournament.paused') : t('tournament.play')}
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
 function Side({ side, win }: { side: TournamentMatch['white']; win: boolean }) {
-  if (!side) return <span className="min-w-0 flex-1 truncate text-sm text-chesscom-400">—</span>;
+  if (!side) return <span className="block truncate text-sm text-chesscom-400">—</span>;
   return (
     <span className={cn(
-      'flex min-w-0 flex-1 items-center gap-1.5 truncate text-sm',
+      'flex w-full min-w-0 items-center gap-1.5 text-sm',
       win ? 'font-semibold text-chesscom-900 dark:text-chesscom-100' : 'text-chesscom-600 dark:text-chesscom-300',
     )}>
       <span className="shrink-0">{side.avatar_emoji}</span>
-      <span className="truncate">{side.display_name}</span>
+      <span className="min-w-0 truncate">{side.display_name}</span>
     </span>
   );
 }

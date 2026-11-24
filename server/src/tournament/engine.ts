@@ -14,7 +14,7 @@
 //     order. An unpaired player (odd count) plays the Stockfish stand-in
 //     instead of sitting the round out.
 //   * A bot match never eliminates anybody: the human always moves on, but
-//     the result still counts for the tournament points (1 / 0.5 / 0) and the
+//     the result still counts for the tournament points (2 / 1 / 0) and the
 //     game is saved like any other.
 //   * Tournament games are unrated (rated = 0): they must not move anybody's
 //     Glicko rating. The tournament keeps its own score.
@@ -530,6 +530,12 @@ function notifyPlayer(userId: number, tournamentId: number, matchId: number): vo
 
 // ---- results ----
 
+/** A drawn game: one point apiece. */
+function scoreDraw(tournamentId: number, ...userIds: number[]): void {
+  const stmt = db.prepare('UPDATE tournament_players SET points = points + 1 WHERE tournament_id = ? AND user_id = ?');
+  for (const userId of userIds) stmt.run(tournamentId, userId);
+}
+
 /**
  * A human-vs-human match was decided. `result` is from White's point of view.
  *
@@ -548,7 +554,8 @@ export function reportMatchResult(matchId: number, result: TournamentResult): vo
   if (result === '1/2-1/2') {
     // A draw is replayed: the same two players, a fresh game, nobody out.
     // The finished game stays in the players' history — it was played — but
-    // the match continues with a new one.
+    // the match continues with a new one. The draw itself is scored: one
+    // point to each side, so every game of the match adds to the standings.
     const attempt = countAttempts(matchId) + 1;
     const names = playerNames([whiteId, blackId]);
     createMatchGame(matchId, tournament, {
@@ -561,6 +568,7 @@ export function reportMatchResult(matchId: number, result: TournamentResult): vo
     db.prepare(
       `UPDATE tournament_matches SET status = 'active', result = NULL, winner_user_id = NULL, finished_at = NULL WHERE id = ?`,
     ).run(matchId);
+    scoreDraw(tournament.id, whiteId, blackId);
     notifyPlayer(whiteId, tournament.id, matchId);
     notifyPlayer(blackId, tournament.id, matchId);
     return;
@@ -569,7 +577,7 @@ export function reportMatchResult(matchId: number, result: TournamentResult): vo
   const whiteWon = result === '1-0';
   const winnerId = whiteWon ? whiteId : blackId;
   const loserId = whiteWon ? blackId : whiteId;
-  db.prepare('UPDATE tournament_players SET points = points + 1 WHERE tournament_id = ? AND user_id = ?')
+  db.prepare('UPDATE tournament_players SET points = points + 2 WHERE tournament_id = ? AND user_id = ?')
     .run(tournament.id, winnerId);
   db.prepare(`UPDATE tournament_players SET status = 'eliminated' WHERE tournament_id = ? AND user_id = ?`)
     .run(tournament.id, loserId);
@@ -592,7 +600,9 @@ export function reportBotMatchResult(matchId: number, outcome: 'win' | 'draw' | 
   const humanId = match.white_is_bot === 1 ? match.black_user_id : match.white_user_id;
   if (!humanId) return;
 
-  const points = outcome === 'win' ? 1 : outcome === 'draw' ? 0.5 : 0;
+  // 2 for a win, 1 for a draw, 0 for a loss — the bot's half of the score is
+  // nobody's: it has no seat in the standings.
+  const points = outcome === 'win' ? 2 : outcome === 'draw' ? 1 : 0;
   // The stored result stays in chess notation from White's point of view, so
   // the bracket reads the same way for a bot match as for a real one.
   const humanIsWhite = match.white_is_bot === 0;
@@ -709,7 +719,7 @@ export function resolveMatch(matchId: number, winnerUserId: number): boolean {
 
   const result: TournamentResult = winnerUserId === whiteId ? '1-0' : '0-1';
   const loserId = winnerUserId === whiteId ? blackId : whiteId;
-  db.prepare('UPDATE tournament_players SET points = points + 1 WHERE tournament_id = ? AND user_id = ?')
+  db.prepare('UPDATE tournament_players SET points = points + 2 WHERE tournament_id = ? AND user_id = ?')
     .run(tournament.id, winnerUserId);
   db.prepare(`UPDATE tournament_players SET status = 'eliminated' WHERE tournament_id = ? AND user_id = ?`)
     .run(tournament.id, loserId);

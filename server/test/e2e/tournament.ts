@@ -151,7 +151,7 @@ async function main() {
   check(decided.status === 'finished', 'the match is decided');
   const standings = afterGame.json.players as any[];
   check(standings.some((p: any) => p.status === 'eliminated'), 'the loser is out');
-  check(standings.some((p: any) => p.points === 1), 'the winner has a point');
+  check(standings.some((p: any) => p.points === 2), 'the winner has two points');
 
   console.log('the bot match');
   // The player who is not in the human-vs-human match sits the bot one.

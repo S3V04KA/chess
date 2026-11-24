@@ -1388,6 +1388,7 @@
     "status": {
       "open": "Ждёт старта",
       "running": "Идёт",
+      "paused": "На паузе",
       "finished": "Завершён",
       "cancelled": "Отменён"
     },
